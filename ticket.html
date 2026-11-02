@@ -45,6 +45,25 @@
         window.onSnapshot = onSnapshot;
         window.writeBatch = writeBatch;
 
+        // Seed default sample data into Firestore if cloud collection is empty
+        async function seedDefaultCloudData() {
+            if (!window.db || !window.doc || !window.setDoc) {
+                fallbackToLocalStorage();
+                return;
+            }
+            try {
+                for (const item of DEFAULT_INITIAL_DATA) {
+                    const docId = String(item['Tiket ID']).replace(/[/\\#%?]/g, '_');
+                    const docRef = window.doc(window.db, 'artifacts', window.appId, 'public', 'data', 'pm_tickets', docId);
+                    await window.setDoc(docRef, item, { merge: true });
+                }
+            } catch (err) {
+                console.warn("Could not seed initial data to cloud, using local fallback:", err);
+                fallbackToLocalStorage();
+            }
+        }
+        window.seedDefaultCloudData = seedDefaultCloudData;
+
         // Attach listenToCloudDatabase directly in the module context to ensure immediate global availability
         window.listenToCloudDatabase = function() {
             if (!window.db || !window.collection) {
