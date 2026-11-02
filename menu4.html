@@ -14,9 +14,6 @@
     <!-- SheetJS CDN (Excel / CSV Reader & Writer) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- Dexie.js CDN (IndexedDB Wrapper) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
-
     <!-- Google Fonts Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
@@ -121,13 +118,13 @@
             <div class="bg-slate-800/80 backdrop-blur border border-slate-700/60 p-5 rounded-xl flex items-center justify-between shadow-sm">
                 <div>
                     <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Status Database</p>
-                    <h3 class="text-sm font-semibold text-emerald-400 mt-2 flex items-center gap-2">
+                    <h3 id="cloudStatus" class="text-sm font-semibold text-emerald-400 mt-2 flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        IndexedDB Active
+                        Firebase Cloud Connected
                     </h3>
                 </div>
                 <div class="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-xl border border-purple-500/20">
-                    <i class="fa-solid fa-database"></i>
+                    <i class="fa-solid fa-cloud text-indigo-400"></i>
                 </div>
             </div>
         </div>
@@ -405,17 +402,27 @@
         <div id="toastMessage" class="text-sm font-medium">Notifikasi</div>
     </div>
 
-    <!-- Application Logic Javascript -->
-    <script>
-        // -------------------------------------------------------------
-        // 1. DATABASE INITIALIZATION (Dexie.js / IndexedDB)
-        // -------------------------------------------------------------
-        const db = new Dexie("SiteManagementDB");
+    <!-- Firebase Script (Cloud Data Sync for GitHub Pages) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Define DB Schema with 25 Column Keys (vendor_ran removed)
-        db.version(2).stores({
-            sites: 'site_id, site_name, kab_kota, base, kecamatan, desa, lat_nms, long_nms, lat_oss, long_oss, tipe_power, type_battery, lte_band, lte_bw, tipe_bbu, tipe_rru, kapasitas_ul, kapasitas_dl, tipe_tower, tinggi_antenna, tipe_antenna, vendor_transmisi, poi, sk, kontak_sk'
-        });
+        // Environment variables / fallback
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'site-management-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            // Default demo config (Placeholder for standalone deployment)
+            apiKey: "AIzaSyDemoKeyOnlyReplaceWithYoursIfCustom",
+            authDomain: "demo-app.firebaseapp.com",
+            projectId: "demo-app",
+            storageBucket: "demo-app.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:demo"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
         // 25 Keys Standard Mapping List
         const COLUMN_KEYS = [
@@ -446,31 +453,95 @@
             { key: 'kontak_sk', label: 'KONTAK SK' }
         ];
 
-        // -------------------------------------------------------------
-        // APP STATE MANAGEMENT
-        // -------------------------------------------------------------
-        let allSitesData = [];
-        let filteredData = [];
-        let currentPage = 1;
-        let pageSize = 25;
+        // Global state accessible by inline functions
+        window.allSitesData = [];
+        window.filteredData = [];
+        window.currentPage = 1;
+        window.pageSize = 25;
+        window.COLUMN_KEYS = COLUMN_KEYS;
 
-        // On Load Init
-        window.onload = async function() {
-            await loadDataFromDB();
-        };
+        // Path standard to allow public shared data across all users on GitHub Pages
+        const getPublicCollectionRef = () => collection(db, 'artifacts', appId, 'public', 'data', 'sites');
 
-        // Load All Data from IndexedDB
-        async function loadDataFromDB() {
+        // Authentication Init
+        async function initAuth() {
             try {
-                allSitesData = await db.sites.toArray();
-                applyFilterAndRender();
-                updateStats();
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
             } catch (err) {
-                showToast("Gagal memuat data dari database!", "error");
-                console.error(err);
+                console.warn("Auth error, falling back:", err);
             }
         }
 
+        // Live Realtime Synchronization Listener
+        function subscribeToRealtimeSites() {
+            const sitesCol = getPublicCollectionRef();
+            onSnapshot(sitesCol, (snapshot) => {
+                const data = [];
+                snapshot.forEach((docSnap) => {
+                    data.push(docSnap.data());
+                });
+                window.allSitesData = data;
+                window.applyFilterAndRender();
+                window.updateStats();
+            }, (error) => {
+                console.error("Firestore listen error:", error);
+                window.showToast("Gagal menyinkronkan data cloud!", "error");
+            });
+        }
+
+        // Save single site to Cloud
+        window.saveSiteToCloud = async function(siteData) {
+            if (!auth.currentUser) await initAuth();
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sites', String(siteData.site_id));
+            await setDoc(docRef, siteData);
+        };
+
+        // Bulk Save sites to Cloud
+        window.bulkSaveSitesToCloud = async function(sitesArray) {
+            if (!auth.currentUser) await initAuth();
+            const batchSize = 400; // Batch operations limit guard
+            for (let i = 0; i < sitesArray.length; i += batchSize) {
+                const chunk = sitesArray.slice(i, i + batchSize);
+                const batch = writeBatch(db);
+                chunk.forEach(item => {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sites', String(item.site_id));
+                    batch.set(docRef, item);
+                });
+                await batch.commit();
+            }
+        };
+
+        // Delete single site from Cloud
+        window.deleteSiteFromCloud = async function(siteId) {
+            if (!auth.currentUser) await initAuth();
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sites', String(siteId));
+            await deleteDoc(docRef);
+        };
+
+        // Clear all sites from Cloud
+        window.clearAllSitesFromCloud = async function() {
+            if (!auth.currentUser) await initAuth();
+            const querySnapshot = await getDocs(getPublicCollectionRef());
+            const batch = writeBatch(db);
+            querySnapshot.forEach((docSnap) => {
+                batch.delete(docSnap.ref);
+            });
+            await batch.commit();
+        };
+
+        // App initialization
+        window.onload = async function() {
+            await initAuth();
+            subscribeToRealtimeSites();
+        };
+    </script>
+
+    <!-- Application UI Logic -->
+    <script>
         // -------------------------------------------------------------
         // RENDER TABLE & PAGINATION
         // -------------------------------------------------------------
@@ -478,9 +549,9 @@
             const query = document.getElementById('searchInput').value.toLowerCase().trim();
             
             if (query === '') {
-                filteredData = [...allSitesData];
+                window.filteredData = [...window.allSitesData];
             } else {
-                filteredData = allSitesData.filter(item => {
+                window.filteredData = window.allSitesData.filter(item => {
                     return (item.site_id && item.site_id.toString().toLowerCase().includes(query)) ||
                            (item.site_name && item.site_name.toString().toLowerCase().includes(query)) ||
                            (item.kab_kota && item.kab_kota.toString().toLowerCase().includes(query));
@@ -494,15 +565,15 @@
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
 
-            const total = filteredData.length;
+            const total = window.filteredData.length;
             document.getElementById('totalRecords').innerText = total;
 
             if (total === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="27" class="text-center py-12 text-slate-500">
-                            <i class="fa-solid fa-folder-open text-4xl mb-3 block"></i>
-                            Tidak ada data site yang ditemukan. Sila tambahkan data atau upload file Excel.
+                            <i class="fa-solid fa-cloud-arrow-up text-4xl mb-3 block text-indigo-400"></i>
+                            Tidak ada data site di Cloud Database. Silakan tambahkan data atau upload file Excel.
                         </td>
                     </tr>
                 `;
@@ -513,17 +584,17 @@
             }
 
             // Calculate pagination indices
-            const totalPages = Math.ceil(total / pageSize);
-            if (currentPage > totalPages) currentPage = totalPages;
-            if (currentPage < 1) currentPage = 1;
+            const totalPages = Math.ceil(total / window.pageSize);
+            if (window.currentPage > totalPages) window.currentPage = totalPages;
+            if (window.currentPage < 1) window.currentPage = 1;
 
-            const startIdx = (currentPage - 1) * pageSize;
-            const endIdx = Math.min(startIdx + pageSize, total);
+            const startIdx = (window.currentPage - 1) * window.pageSize;
+            const endIdx = Math.min(startIdx + window.pageSize, total);
 
             document.getElementById('pageStart').innerText = startIdx + 1;
             document.getElementById('pageEnd').innerText = endIdx;
 
-            const pageItems = filteredData.slice(startIdx, endIdx);
+            const pageItems = window.filteredData.slice(startIdx, endIdx);
 
             pageItems.forEach((site, index) => {
                 const rowNum = startIdx + index + 1;
@@ -582,21 +653,21 @@
 
             // Prev Button
             const prevBtn = document.createElement('button');
-            prevBtn.className = `px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 ${currentPage === 1 ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`;
+            prevBtn.className = `px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 ${window.currentPage === 1 ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`;
             prevBtn.innerHTML = `<i class="fa-solid fa-chevron-left"></i>`;
-            prevBtn.disabled = currentPage === 1;
-            prevBtn.onclick = () => { currentPage--; renderTable(); };
+            prevBtn.disabled = window.currentPage === 1;
+            prevBtn.onclick = () => { window.currentPage--; renderTable(); };
             container.appendChild(prevBtn);
 
             // Page numbers
             for (let i = 1; i <= totalPages; i++) {
-                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+                if (i === 1 || i === totalPages || (i >= window.currentPage - 1 && i <= window.currentPage + 1)) {
                     const pageBtn = document.createElement('button');
-                    pageBtn.className = `px-3 py-1.5 rounded-lg text-xs font-medium border ${i === currentPage ? 'bg-indigo-600 border-indigo-500 text-white font-bold' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`;
+                    pageBtn.className = `px-3 py-1.5 rounded-lg text-xs font-medium border ${i === window.currentPage ? 'bg-indigo-600 border-indigo-500 text-white font-bold' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`;
                     pageBtn.innerText = i;
-                    pageBtn.onclick = () => { currentPage = i; renderTable(); };
+                    pageBtn.onclick = () => { window.currentPage = i; renderTable(); };
                     container.appendChild(pageBtn);
-                } else if (i === currentPage - 2 || i === currentPage + 2) {
+                } else if (i === window.currentPage - 2 || i === window.currentPage + 2) {
                     const dots = document.createElement('span');
                     dots.className = "text-slate-500 text-xs px-1";
                     dots.innerText = "...";
@@ -606,21 +677,21 @@
 
             // Next Button
             const nextBtn = document.createElement('button');
-            nextBtn.className = `px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 ${currentPage === totalPages ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`;
+            nextBtn.className = `px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 ${window.currentPage === totalPages ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`;
             nextBtn.innerHTML = `<i class="fa-solid fa-chevron-right"></i>`;
-            nextBtn.disabled = currentPage === totalPages;
-            nextBtn.onclick = () => { currentPage++; renderTable(); };
+            nextBtn.disabled = window.currentPage === totalPages;
+            nextBtn.onclick = () => { window.currentPage++; renderTable(); };
             container.appendChild(nextBtn);
         }
 
         function handleSearch() {
-            currentPage = 1;
+            window.currentPage = 1;
             applyFilterAndRender();
         }
 
         function changePageSize() {
-            pageSize = parseInt(document.getElementById('pageSizeSelect').value);
-            currentPage = 1;
+            window.pageSize = parseInt(document.getElementById('pageSizeSelect').value);
+            window.currentPage = 1;
             renderTable();
         }
 
@@ -628,10 +699,10 @@
         // STATS CALCULATION
         // -------------------------------------------------------------
         function updateStats() {
-            document.getElementById('statTotalSites').innerText = allSitesData.length.toLocaleString();
+            document.getElementById('statTotalSites').innerText = window.allSitesData.length.toLocaleString();
 
             const kabSet = new Set();
-            allSitesData.forEach(item => {
+            window.allSitesData.forEach(item => {
                 if (item.kab_kota) kabSet.add(item.kab_kota.trim());
             });
 
@@ -639,11 +710,13 @@
         }
 
         // -------------------------------------------------------------
-        // BULK UPLOAD (EXCEL / CSV) VIA SHEETJS
+        // BULK UPLOAD TO CLOUD DATABASE
         // -------------------------------------------------------------
         async function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            showToast("Membaca file Excel & mengunggah ke Cloud...", "success");
 
             const reader = new FileReader();
             reader.onload = async function(e) {
@@ -651,11 +724,8 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
 
-                    // Take first sheet
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
-
-                    // Convert to JSON
                     const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
                     if (jsonRows.length === 0) {
@@ -663,35 +733,30 @@
                         return;
                     }
 
-                    // Map Excel columns to IndexedDB Field Names
+                    // Map Excel columns
                     const formattedData = jsonRows.map(row => {
                         const newRow = {};
-                        
-                        COLUMN_KEYS.forEach(col => {
-                            // Find matching header key in Excel (case-insensitive & whitespace trimmed)
+                        window.COLUMN_KEYS.forEach(col => {
                             const matchedHeader = Object.keys(row).find(header => 
                                 header.trim().toLowerCase() === col.label.trim().toLowerCase()
                             );
-
                             newRow[col.key] = matchedHeader ? String(row[matchedHeader]).trim() : "";
                         });
-
                         return newRow;
-                    }).filter(row => row.site_id !== ""); // Site ID is required key
+                    }).filter(row => row.site_id !== "");
 
                     if (formattedData.length === 0) {
-                        showToast("Tidak ditemukan Site ID valid dalam file Excel!", "error");
+                        showToast("Tidak ditemukan Site ID valid!", "error");
                         return;
                     }
 
-                    // Bulk Save to Dexie IndexedDB
-                    await db.sites.bulkPut(formattedData);
-                    await loadDataFromDB();
-                    showToast(`Berhasil meng-import ${formattedData.length} data site!`, "success");
+                    // Sync Bulk Data to Cloud Firestore
+                    await window.bulkSaveSitesToCloud(formattedData);
+                    showToast(`Berhasil mengunggah ${formattedData.length} site ke Cloud Database!`, "success");
 
                 } catch (error) {
                     console.error(error);
-                    showToast("Gagal membaca file Excel/CSV!", "error");
+                    showToast("Gagal mengunggah file ke cloud!", "error");
                 } finally {
                     document.getElementById('excelFileInput').value = '';
                 }
@@ -704,15 +769,14 @@
         // EXPORT TO EXCEL
         // -------------------------------------------------------------
         function exportToExcel() {
-            if (allSitesData.length === 0) {
+            if (window.allSitesData.length === 0) {
                 showToast("Tidak ada data untuk di-export!", "error");
                 return;
             }
 
-            // Map keys back to 26 Readable Column Headers
-            const exportData = allSitesData.map(site => {
+            const exportData = window.allSitesData.map(site => {
                 const row = {};
-                COLUMN_KEYS.forEach(col => {
+                window.COLUMN_KEYS.forEach(col => {
                     row[col.label] = site[col.key] || "";
                 });
                 return row;
@@ -722,20 +786,12 @@
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Site Database");
 
-            // Save file
             const timestamp = new Date().toISOString().slice(0,10);
-            XLSX.writeFile(workbook, `Site_Management_Export_${timestamp}.xlsx`);
+            XLSX.writeFile(workbook, `Site_Management_Cloud_Export_${timestamp}.xlsx`);
             showToast("Export Excel berhasil diunduh!", "success");
         }
 
-        // Download Blank Template Excel
         function downloadTemplate() {
-            const templateHeader = {};
-            COLUMN_KEYS.forEach(col => {
-                templateHeader[col.label] = "";
-            });
-
-            // Sample Row Data
             const sampleRow = {
                 'Site ID': 'JAK001',
                 'SITE NAME': 'JAKARTA_CENTRAL_01',
@@ -782,13 +838,13 @@
             document.getElementById('siteModal').classList.remove('hidden');
         }
 
-        async function openEditModal(siteId) {
-            const site = await db.sites.get(siteId);
+        function openEditModal(siteId) {
+            const site = window.allSitesData.find(s => String(s.site_id) === String(siteId));
             if (!site) return;
 
             document.getElementById('editSiteIdKey').value = site.site_id;
             
-            COLUMN_KEYS.forEach(col => {
+            window.COLUMN_KEYS.forEach(col => {
                 const el = document.getElementById(`field_${col.key}`);
                 if (el) {
                     el.value = site[col.key] || '';
@@ -808,7 +864,7 @@
             event.preventDefault();
 
             const newSiteData = {};
-            COLUMN_KEYS.forEach(col => {
+            window.COLUMN_KEYS.forEach(col => {
                 const el = document.getElementById(`field_${col.key}`);
                 newSiteData[col.key] = el ? el.value.trim() : '';
             });
@@ -819,22 +875,20 @@
             }
 
             try {
-                await db.sites.put(newSiteData);
+                await window.saveSiteToCloud(newSiteData);
                 closeModal();
-                await loadDataFromDB();
-                showToast("Data site berhasil disimpan!", "success");
+                showToast("Data site tersimpan di Cloud!", "success");
             } catch (err) {
                 console.error(err);
-                showToast("Gagal menyimpan data site!", "error");
+                showToast("Gagal menyimpan data ke Cloud!", "error");
             }
         }
 
         async function deleteSingleSite(siteId) {
-            if (confirm(`Apakah Anda yakin ingin menghapus Site ID: ${siteId}?`)) {
+            if (confirm(`Apakah Anda yakin ingin menghapus Site ID: ${siteId} dari Cloud Database?`)) {
                 try {
-                    await db.sites.delete(siteId);
-                    await loadDataFromDB();
-                    showToast(`Site ${siteId} berhasil dihapus.`, "success");
+                    await window.deleteSiteFromCloud(siteId);
+                    showToast(`Site ${siteId} dihapus dari Cloud.`, "success");
                 } catch (err) {
                     console.error(err);
                     showToast("Gagal menghapus site!", "error");
@@ -843,16 +897,15 @@
         }
 
         async function confirmClearAll() {
-            if (allSitesData.length === 0) {
+            if (window.allSitesData.length === 0) {
                 showToast("Database sudah kosong!", "error");
                 return;
             }
 
-            if (confirm("PERINGATAN: Apakah Anda yakin ingin MENGHAPUS SELURUH DATA SITE di database lokal ini? Action ini tidak dapat dibatalkan.")) {
+            if (confirm("PERINGATAN: Apakah Anda yakin ingin MENGHAPUS SELURUH DATA SITE dari Cloud Database? Action ini akan mempengaruhi semua pengunjung website.")) {
                 try {
-                    await db.sites.clear();
-                    await loadDataFromDB();
-                    showToast("Seluruh database telah dibersihkan.", "success");
+                    await window.clearAllSitesFromCloud();
+                    showToast("Seluruh database Cloud telah dibersihkan.", "success");
                 } catch (err) {
                     console.error(err);
                     showToast("Gagal membersihkan database!", "error");
@@ -860,9 +913,6 @@
             }
         }
 
-        // -------------------------------------------------------------
-        // HELPER FUNCTIONS
-        // -------------------------------------------------------------
         function escapeHtml(str) {
             if (typeof str !== 'string') return str;
             return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
