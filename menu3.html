@@ -132,16 +132,31 @@
                     cloudItems.push(docSnap.data());
                 });
 
-                // If DB is empty, initialize with default sample data into Cloud
+                // HANYA seed sampel data JIKA database benar-benar kosong pertama kali & tidak ada di local storage
                 if (cloudItems.length === 0 && snapshot.empty) {
-                    console.log("DB kosong, mengunggah sampel data awal ke Cloud...");
-                    seedSampleDataToCloud();
-                    return;
+                    const localBackup = localStorage.getItem("PM_HUB_DATA_PERSISTENT");
+                    if (!localBackup && window.seedSampleDataToCloud) {
+                        console.log("DB Cloud kosong, mengunggah sampel data awal...");
+                        seedSampleDataToCloud();
+                        return;
+                    } else if (localBackup) {
+                        const parsed = JSON.parse(localBackup);
+                        if (parsed.length > 0) {
+                            window.bulkSaveToCloud(parsed);
+                            return;
+                        }
+                    }
                 }
 
                 // Sort data by NO / Site ID
                 cloudItems.sort((a, b) => (a.no || 0) - (b.no || 0));
                 window.maintenanceData = cloudItems;
+                
+                // Backup ke LocalStorage sebagai cadangan persisten saat refresh
+                try {
+                    localStorage.setItem("PM_HUB_DATA_PERSISTENT", JSON.stringify(cloudItems));
+                } catch(e){}
+
                 window.applyFilters();
                 window.updateKPIs();
                 
@@ -830,15 +845,32 @@
     <!-- Main Logic Script -->
     <script>
         // Key LocalStorage & Initial Sample Data Set
-        const STORAGE_KEY = "PM_HUB_DATA_V3";
+        const STORAGE_KEY = "PM_HUB_DATA_PERSISTENT";
         let activeKpiPeriode = "ALL";
 
+        // Memory State Initializer with Persistent Fallback
+        function loadInitialState() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        return parsed;
+                    }
+                } catch (e) {
+                    console.error("Error parsing local storage", e);
+                }
+            }
+            return window.sampleMaintenanceData ? [...window.sampleMaintenanceData] : [];
+        }
+
         // Global State Array
-        window.maintenanceData = window.sampleMaintenanceData ? [...window.sampleMaintenanceData] : [];
+        window.maintenanceData = loadInitialState();
         window.filteredData = [...window.maintenanceData];
 
         function resetToSampleData() {
-            if (confirm("Apakah Anda yakin ingin me-reset Cloud Database kembali ke data sampel awal? Data yang sudah diedit oleh pengguna lain akan diperbarui.")) {
+            if (confirm("Apakah Anda yakin ingin me-reset Cloud Database kembali ke data sampel awal? Data yang sudah di-upload akan dikembalikan ke awal.")) {
+                localStorage.removeItem(STORAGE_KEY);
                 if (window.seedSampleDataToCloud) {
                     window.seedSampleDataToCloud();
                     showToast("Database Cloud berhasil di-reset ke data sampel!");
