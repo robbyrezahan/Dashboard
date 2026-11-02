@@ -12,6 +12,215 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase Cloud Database SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase References
+        window.firebaseApp = null;
+        window.db = null;
+        window.auth = null;
+        window.appId = typeof __app_id !== 'undefined' ? __app_id : 'pm-dashboard-hub';
+        window.currentUser = null;
+
+        // Sample Data Definitions moved up to ensure availability before seed call
+        window.sampleMaintenanceData = [
+            {
+                no: 1, siteId: "BDG-014", siteName: "Dago Superior Peak", periodePM: "PM1", cluster: "Bandung Raya", jenisBaterai: "Lithium 100Ah",
+                tower: "Approve KMT", power: "Approve KMT", bts: "Approve KMT", transmisi: "Approve TA", cctv: "Approve KMT", hse: "Approve KMT",
+                datePlanAwal: "2026-03-01", wdPlan: "W1-Senin", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "2026-03-01", statusPlanAct: "On Schedule", week: "W1",
+                tglVisit: "2026-03-01", wdVisit: "W1-Senin", teknisi: "Ahmad Rizki", hp: "081234567890", statusProgress: "DONE",
+                noted: "Pembersihan rectifier & penggantian grounding strip", docControl: "APPROVED",
+                chkTower: "PASS", chkPower: "PASS", chkBts: "PASS", chkTransmisi: "PASS", chkCctv: "PASS", chkHse: "PASS",
+                linkCrosscheck: "https://drive.google.com/drive/folders/pm-bdg-014", notedFinal: "Dokumen lengkap dan terverifikasi"
+            },
+            {
+                no: 2, siteId: "JKT-102", siteName: "Kuningan Hub Tower", periodePM: "PM1", cluster: "Jakarta Selatan", jenisBaterai: "VRLA 150Ah",
+                tower: "Approve KMT", power: "Rejected KMT", bts: "Approve TA", transmisi: "Approve TA", cctv: "Uncomplete", hse: "Approve KMT",
+                datePlanAwal: "2026-03-02", wdPlan: "W1-Selasa", statusPlan: "REPLAN", dateReplan: "2026-03-05", planActual: "2026-03-05", statusPlanAct: "Delay", week: "W1",
+                tglVisit: "2026-03-05", wdVisit: "W1-Kamis", teknisi: "Budi Santoso", hp: "081987654321", statusProgress: "DONE",
+                noted: "Modul CCTV mengalami mati total, power module diganti", docControl: "SUBMITTED",
+                chkTower: "PASS", chkPower: "PASS", chkBts: "PASS", chkTransmisi: "PASS", chkCctv: "FAIL", chkHse: "PASS",
+                linkCrosscheck: "https://drive.google.com/drive/folders/pm-jkt-102", notedFinal: "Menunggu penggantian fisik CCTV"
+            },
+            {
+                no: 3, siteId: "BDG-014", siteName: "Dago Superior Peak", periodePM: "PM2", cluster: "Bandung Raya", jenisBaterai: "Lithium 100Ah",
+                tower: "NY", power: "NY", bts: "NY", transmisi: "NY", cctv: "NY", hse: "NY",
+                datePlanAwal: "2026-09-01", wdPlan: "W1-Senin", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "-", statusPlanAct: "Pending", week: "W35",
+                tglVisit: "-", wdVisit: "-", teknisi: "Ahmad Rizki", hp: "081234567890", statusProgress: "IN PROGRESS",
+                noted: "Persiapan material PM Siklus 2", docControl: "NOT YET",
+                chkTower: "N/A", chkPower: "N/A", chkBts: "N/A", chkTransmisi: "N/A", chkCctv: "N/A", chkHse: "N/A",
+                linkCrosscheck: "", notedFinal: "Schedule awal PM2"
+            },
+            {
+                no: 4, siteId: "SUB-045", siteName: "Rungkut Industrial", periodePM: "PM1", cluster: "Surabaya Barat", jenisBaterai: "Lithium 150Ah",
+                tower: "Approve TA", power: "Approve KMT", bts: "Approve KMT", transmisi: "Approve KMT", cctv: "Approve TA", hse: "Approve KMT",
+                datePlanAwal: "2026-03-03", wdPlan: "W1-Rabu", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "2026-03-03", statusPlanAct: "On Schedule", week: "W1",
+                tglVisit: "2026-03-03", wdVisit: "W1-Rabu", teknisi: "Eko Prasetyo", hp: "085678901234", statusProgress: "DONE",
+                noted: "Pengecekan rutin berjalan lancar", docControl: "APPROVED",
+                chkTower: "PASS", chkPower: "PASS", chkBts: "PASS", chkTransmisi: "PASS", chkCctv: "PASS", chkHse: "PASS",
+                linkCrosscheck: "https://drive.google.com/drive/folders/pm-sub-045", notedFinal: "Verified OK"
+            },
+            {
+                no: 5, siteId: "MDN-201", siteName: "Medan Fair Plaza", periodePM: "PM2", cluster: "Medan Kota", jenisBaterai: "VRLA 200Ah",
+                tower: "Rejected TA", power: "Approve KMT", bts: "Approve KMT", transmisi: "Uncomplete", cctv: "NY", hse: "Approve KMT",
+                datePlanAwal: "2026-09-10", wdPlan: "W2-Kamis", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "-", statusPlanAct: "Pending", week: "W36",
+                tglVisit: "-", wdVisit: "-", teknisi: "Doni Siregar", hp: "081345678901", statusProgress: "PENDING",
+                noted: "Akses lokasi sedang disiapkan", docControl: "NOT YET",
+                chkTower: "N/A", chkPower: "N/A", chkBts: "N/A", chkTransmisi: "N/A", chkCctv: "N/A", chkHse: "N/A",
+                linkCrosscheck: "", notedFinal: "Menunggu izin masuk"
+            }
+        ];
+
+        // Firebase Configuration (Uses environment config or fallback)
+        const defaultConfig = {
+            apiKey: "AIzaSyDemoConfigKeyForDeploymentOnly",
+            authDomain: "pm-dashboard-demo.firebaseapp.com",
+            projectId: "pm-dashboard-demo",
+            storageBucket: "pm-dashboard-demo.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : defaultConfig;
+
+        // Initialize Firebase App
+        window.firebaseApp = initializeApp(firebaseConfig);
+        window.db = getFirestore(window.firebaseApp);
+        window.auth = getAuth(window.firebaseApp);
+
+        // Authenticate user & start real-time listener
+        const initAuthAndDB = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(window.auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(window.auth);
+                }
+            } catch (err) {
+                console.warn("Auth initialization warning, retrying anonymously:", err);
+                try {
+                    await signInAnonymously(window.auth);
+                } catch (e) {
+                    console.error("Auth failed:", e);
+                }
+            }
+
+            onAuthStateChanged(window.auth, (user) => {
+                if (user) {
+                    window.currentUser = user;
+                    console.log("Firebase Authenticated UID:", user.uid);
+                    listenToCloudData();
+                }
+            });
+        };
+
+        // Real-time Cloud Firestore Listener (RULE 1 Strict Path & RULE 2 Simple Queries)
+        function listenToCloudData() {
+            if (!window.db || !window.currentUser) return;
+
+            const colRef = collection(window.db, 'artifacts', window.appId, 'public', 'data', 'sites');
+
+            onSnapshot(colRef, (snapshot) => {
+                const cloudItems = [];
+                snapshot.forEach((docSnap) => {
+                    cloudItems.push(docSnap.data());
+                });
+
+                // If DB is empty, initialize with default sample data into Cloud
+                if (cloudItems.length === 0 && snapshot.empty) {
+                    console.log("DB kosong, mengunggah sampel data awal ke Cloud...");
+                    seedSampleDataToCloud();
+                    return;
+                }
+
+                // Sort data by NO / Site ID
+                cloudItems.sort((a, b) => (a.no || 0) - (b.no || 0));
+                window.maintenanceData = cloudItems;
+                window.applyFilters();
+                window.updateKPIs();
+                
+                // Show Cloud Sync status in UI
+                const syncBadge = document.getElementById("cloudSyncStatus");
+                if (syncBadge) {
+                    syncBadge.innerHTML = `<span class="inline-flex items-center text-emerald-400 text-xs font-semibold"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>Cloud Live Sync</span>`;
+                }
+            }, (error) => {
+                console.error("Firestore Listen Error:", error);
+                const syncBadge = document.getElementById("cloudSyncStatus");
+                if (syncBadge) {
+                    syncBadge.innerHTML = `<span class="inline-flex items-center text-amber-400 text-xs font-semibold"><span class="w-2 h-2 rounded-full bg-amber-400 mr-1.5"></span>Offline / Local Mode</span>`;
+                }
+            });
+        }
+
+        // Seed Sample Data to Cloud Database
+        async function seedSampleDataToCloud() {
+            if (!window.db || !window.currentUser) return;
+            if (!Array.isArray(window.sampleMaintenanceData) || window.sampleMaintenanceData.length === 0) return;
+            try {
+                const batch = writeBatch(window.db);
+                window.sampleMaintenanceData.forEach(item => {
+                    const docId = `${item.siteId}_${item.periodePM}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                    const docRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'sites', docId);
+                    batch.set(docRef, item);
+                });
+                await batch.commit();
+                console.log("Sample data berhasil diunggah ke Cloud Firestore!");
+            } catch (err) {
+                console.error("Gagal seed sampel data:", err);
+            }
+        }
+
+        // Expose Functions to Global Window Context
+        window.seedSampleDataToCloud = seedSampleDataToCloud;
+        
+        // Save single record to Cloud Firestore
+        window.saveRecordToCloud = async (record) => {
+            if (!window.db || !window.currentUser) {
+                console.warn("DB belum siap, menggunakan memori lokal");
+                return;
+            }
+            const docId = `${record.siteId}_${record.periodePM}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const docRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'sites', docId);
+            await setDoc(docRef, record);
+        };
+
+        // Delete single record from Cloud Firestore
+        window.deleteRecordFromCloud = async (siteId, periodePM) => {
+            if (!window.db || !window.currentUser) return;
+            const docId = `${siteId}_${periodePM}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const docRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'sites', docId);
+            await deleteDoc(docRef);
+        };
+
+        // Bulk Save to Cloud Firestore via Batch
+        window.bulkSaveToCloud = async (recordsArray) => {
+            if (!window.db || !window.currentUser) return;
+            
+            // Firestore writeBatch has max limit 500 operations per batch
+            const chunkSize = 400;
+            for (let i = 0; i < recordsArray.length; i += chunkSize) {
+                const chunk = recordsArray.slice(i, i + chunkSize);
+                const batch = writeBatch(window.db);
+                chunk.forEach(record => {
+                    const docId = `${record.siteId}_${record.periodePM}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                    const docRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'sites', docId);
+                    batch.set(docRef, record);
+                });
+                await batch.commit();
+            }
+        };
+
+        // Initialize on Script Load
+        initAuthAndDB();
+    </script>
+
     <script>
         tailwind.config = {
             theme: {
@@ -70,7 +279,14 @@
                     <i data-lucide="radio-tower" class="w-6 h-6"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold leading-tight">Preventive Maintenance Hub</h1>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="text-lg font-bold leading-tight">Preventive Maintenance Hub</h1>
+                        <div id="cloudSyncStatus" class="ml-2">
+                            <span class="inline-flex items-center text-slate-400 text-xs font-medium">
+                                <span class="w-2 h-2 rounded-full bg-slate-500 mr-1.5"></span>Connecting Cloud...
+                            </span>
+                        </div>
+                    </div>
                     <p class="text-xs text-slate-400">Telecommunication Site Operation & Audit Dashboard</p>
                 </div>
             </div>
@@ -87,7 +303,9 @@
                     <i data-lucide="download" class="w-4 h-4"></i>
                     <span>Export Excel</span>
                 </button>
-              
+                <button onclick="resetToSampleData()" class="flex items-center space-x-1 bg-slate-800 hover:bg-rose-900 text-rose-300 hover:text-white text-xs font-semibold px-2.5 py-2 rounded-lg border border-slate-700 transition-all" title="Reset ke Dummy Data">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                </button>
             </div>
         </div>
     </header>
@@ -615,87 +833,16 @@
         const STORAGE_KEY = "PM_HUB_DATA_V3";
         let activeKpiPeriode = "ALL";
 
-        const sampleMaintenanceData = [
-            {
-                no: 1, siteId: "BDG-014", siteName: "Dago Superior Peak", periodePM: "PM1", cluster: "Bandung Raya", jenisBaterai: "Lithium 100Ah",
-                tower: "Approve KMT", power: "Approve KMT", bts: "Approve KMT", transmisi: "Approve TA", cctv: "Approve KMT", hse: "Approve KMT",
-                datePlanAwal: "2026-03-01", wdPlan: "W1-Senin", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "2026-03-01", statusPlanAct: "On Schedule", week: "W1",
-                tglVisit: "2026-03-01", wdVisit: "W1-Senin", teknisi: "Ahmad Rizki", hp: "081234567890", statusProgress: "DONE",
-                noted: "Pembersihan rectifier & penggantian grounding strip", docControl: "APPROVED",
-                chkTower: "PASS", chkPower: "PASS", chkBts: "PASS", chkTransmisi: "PASS", chkCctv: "PASS", chkHse: "PASS",
-                linkCrosscheck: "https://drive.google.com/drive/folders/pm-bdg-014", notedFinal: "Dokumen lengkap dan terverifikasi"
-            },
-            {
-                no: 2, siteId: "JKT-102", siteName: "Kuningan Hub Tower", periodePM: "PM1", cluster: "Jakarta Selatan", jenisBaterai: "VRLA 150Ah",
-                tower: "Approve KMT", power: "Rejected KMT", bts: "Approve TA", transmisi: "Approve TA", cctv: "Uncomplete", hse: "Approve KMT",
-                datePlanAwal: "2026-03-02", wdPlan: "W1-Selasa", statusPlan: "REPLAN", dateReplan: "2026-03-05", planActual: "2026-03-05", statusPlanAct: "Delayed", week: "W1",
-                tglVisit: "2026-03-05", wdVisit: "W1-Kamis", teknisi: "Budi Santoso", hp: "081987654321", statusProgress: "DONE",
-                noted: "Modul CCTV mengalami mati total, power module diganti", docControl: "SUBMITTED",
-                chkTower: "PASS", chkPower: "PASS", chkBts: "PASS", chkTransmisi: "PASS", chkCctv: "FAIL", chkHse: "PASS",
-                linkCrosscheck: "https://drive.google.com/drive/folders/pm-jkt-102", notedFinal: "Menunggu penggantian fisik CCTV"
-            },
-            {
-                no: 3, siteId: "BDG-014", siteName: "Dago Superior Peak", periodePM: "PM2", cluster: "Bandung Raya", jenisBaterai: "Lithium 100Ah",
-                tower: "NY", power: "NY", bts: "NY", transmisi: "NY", cctv: "NY", hse: "NY",
-                datePlanAwal: "2026-09-01", wdPlan: "W1-Senin", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "-", statusPlanAct: "Pending", week: "W35",
-                tglVisit: "-", wdVisit: "-", teknisi: "Ahmad Rizki", hp: "081234567890", statusProgress: "IN PROGRESS",
-                noted: "Persiapan material PM Siklus 2", docControl: "NOT YET",
-                chkTower: "N/A", chkPower: "N/A", chkBts: "N/A", chkTransmisi: "N/A", chkCctv: "N/A", chkHse: "N/A",
-                linkCrosscheck: "", notedFinal: "Schedule awal PM2"
-            },
-            {
-                no: 4, siteId: "SUB-045", siteName: "Rungkut Industrial", periodePM: "PM1", cluster: "Surabaya Barat", jenisBaterai: "Lithium 150Ah",
-                tower: "Approve TA", power: "Approve KMT", bts: "Approve KMT", transmisi: "Approve KMT", cctv: "Approve TA", hse: "Approve KMT",
-                datePlanAwal: "2026-03-03", wdPlan: "W1-Rabu", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "2026-03-03", statusPlanAct: "On Schedule", week: "W1",
-                tglVisit: "2026-03-03", wdVisit: "W1-Rabu", teknisi: "Eko Prasetyo", hp: "085678901234", statusProgress: "DONE",
-                noted: "Pengecekan rutin berjalan lancar", docControl: "APPROVED",
-                chkTower: "PASS", chkPower: "PASS", chkBts: "PASS", chkTransmisi: "PASS", chkCctv: "PASS", chkHse: "PASS",
-                linkCrosscheck: "https://drive.google.com/drive/folders/pm-sub-045", notedFinal: "Verified OK"
-            },
-            {
-                no: 5, siteId: "MDN-201", siteName: "Medan Fair Plaza", periodePM: "PM2", cluster: "Medan Kota", jenisBaterai: "VRLA 200Ah",
-                tower: "Rejected TA", power: "Approve KMT", bts: "Approve KMT", transmisi: "Uncomplete", cctv: "NY", hse: "Approve KMT",
-                datePlanAwal: "2026-09-10", wdPlan: "W2-Kamis", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "-", statusPlanAct: "Pending", week: "W36",
-                tglVisit: "-", wdVisit: "-", teknisi: "Doni Siregar", hp: "081345678901", statusProgress: "PENDING",
-                noted: "Akses lokasi sedang disiapkan", docControl: "NOT YET",
-                chkTower: "N/A", chkPower: "N/A", chkBts: "N/A", chkTransmisi: "N/A", chkCctv: "N/A", chkHse: "N/A",
-                linkCrosscheck: "", notedFinal: "Menunggu izin masuk"
-            }
-        ];
-
-        // Load persisted data or default to sample
-        let maintenanceData = loadDataFromStorage();
-        let filteredData = [...maintenanceData];
-
-        // Persistent Data Load & Save logic
-        function loadDataFromStorage() {
-            try {
-                const stored = localStorage.getItem(STORAGE_KEY);
-                if (stored) {
-                    return JSON.parse(stored);
-                }
-            } catch (err) {
-                console.error("Gagal membaca LocalStorage:", err);
-            }
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleMaintenanceData));
-            return sampleMaintenanceData;
-        }
-
-        function saveDataToStorage() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(maintenanceData));
-            } catch (err) {
-                console.error("Gagal menyimpan ke LocalStorage:", err);
-            }
-        }
+        // Global State Array
+        window.maintenanceData = window.sampleMaintenanceData ? [...window.sampleMaintenanceData] : [];
+        window.filteredData = [...window.maintenanceData];
 
         function resetToSampleData() {
-            if (confirm("Apakah Anda yakin ingin me-reset data kembali ke data sampel awal? Data lokal yang baru ditambahkan/di-import akan hilang.")) {
-                maintenanceData = JSON.parse(JSON.stringify(sampleMaintenanceData));
-                saveDataToStorage();
-                applyFilters();
-                updateKPIs();
-                showToast("Data berhasil di-reset ke sampel awal!");
+            if (confirm("Apakah Anda yakin ingin me-reset Cloud Database kembali ke data sampel awal? Data yang sudah diedit oleh pengguna lain akan diperbarui.")) {
+                if (window.seedSampleDataToCloud) {
+                    window.seedSampleDataToCloud();
+                    showToast("Database Cloud berhasil di-reset ke data sampel!");
+                }
             }
         }
 
@@ -1013,7 +1160,7 @@
         }
 
         // Add/Edit Record Save Handler
-        function saveRecord(e) {
+        async function saveRecord(e) {
             e.preventDefault();
             const editIndex = parseInt(document.getElementById("editIndex").value);
 
@@ -1061,73 +1208,41 @@
             };
 
             if (editIndex >= 0) {
-                record.no = maintenanceData[editIndex].no;
-                maintenanceData[editIndex] = record;
-                showToast("Data Site Maintenance berhasil diperbarui!");
+                record.no = window.maintenanceData[editIndex].no;
+                window.maintenanceData[editIndex] = record;
+                showToast("Data Site Maintenance berhasil diperbarui di Cloud!");
             } else {
-                record.no = maintenanceData.length + 1;
-                maintenanceData.unshift(record);
-                showToast("Data Site Maintenance baru berhasil ditambahkan!");
+                record.no = window.maintenanceData.length + 1;
+                window.maintenanceData.unshift(record);
+                showToast("Data Site Maintenance baru tersimpan di Cloud!");
             }
 
-            saveDataToStorage();
+            // Sync to Firebase Cloud Firestore
+            if (window.saveRecordToCloud) {
+                await window.saveRecordToCloud(record);
+            }
+
             closeModal();
             applyFilters();
             updateKPIs();
         }
 
-        // Edit Record Loader
-        function editRecord(index) {
-            const item = maintenanceData[index];
+        // Delete Record
+        async function deleteRecord(index) {
+            const item = window.maintenanceData[index];
             if (!item) return;
 
-            document.getElementById("editIndex").value = index;
-            document.getElementById("modalTitle").innerText = `Edit Data Site ${item.siteId} (${item.periodePM || 'PM1'})`;
+            if (confirm(`Apakah Anda yakin ingin menghapus site ${item.siteId} (${item.periodePM || 'PM1'}) dari daftar Cloud?`)) {
+                window.maintenanceData.splice(index, 1);
+                
+                // Delete from Firebase Cloud
+                if (window.deleteRecordFromCloud) {
+                    await window.deleteRecordFromCloud(item.siteId, item.periodePM || 'PM1');
+                }
 
-            document.getElementById("formPeriodePM").value = item.periodePM || "PM1";
-            document.getElementById("formSiteId").value = item.siteId || "";
-            document.getElementById("formSiteName").value = item.siteName || "";
-            document.getElementById("formCluster").value = item.cluster || "Bandung Raya";
-            document.getElementById("formJenisBaterai").value = item.jenisBaterai || "";
-            document.getElementById("formTower").value = item.tower || "Approve KMT";
-            document.getElementById("formPower").value = item.power || "Approve KMT";
-            document.getElementById("formBts").value = item.bts || "Approve KMT";
-            document.getElementById("formTransmisi").value = item.transmisi || "Approve KMT";
-            document.getElementById("formCctv").value = item.cctv || "Approve KMT";
-            
-            document.getElementById("formDatePlanAwal").value = item.datePlanAwal !== '-' ? item.datePlanAwal : '';
-            document.getElementById("formStatusPlan").value = item.statusPlan || "SCHEDULED";
-            document.getElementById("formDateReplan").value = item.dateReplan !== '-' ? item.dateReplan : '';
-            document.getElementById("formPlanActual").value = item.planActual !== '-' ? item.planActual : '';
-            
-            document.getElementById("formTglVisit").value = item.tglVisit !== '-' ? item.tglVisit : '';
-            document.getElementById("formTeknisi").value = item.teknisi !== '-' ? item.teknisi : '';
-            document.getElementById("formHp").value = item.hp !== '-' ? item.hp : '';
-            document.getElementById("formStatusProgress").value = item.statusProgress || "DONE";
-            
-            document.getElementById("formChkTower").value = item.chkTower || "PASS";
-            document.getElementById("formChkPower").value = item.chkPower || "PASS";
-            document.getElementById("formChkBts").value = item.chkBts || "PASS";
-            document.getElementById("formChkTransmisi").value = item.chkTransmisi || "PASS";
-            document.getElementById("formChkCctv").value = item.chkCctv || "PASS";
-            document.getElementById("formChkHse").value = item.chkHse || "PASS";
-            
-            document.getElementById("formDocControl").value = item.docControl || "APPROVED";
-            document.getElementById("formLinkCrosscheck").value = item.linkCrosscheck || "";
-            document.getElementById("formNotedFinal").value = item.notedFinal !== '-' ? item.notedFinal : (item.noted || '');
-
-            document.getElementById("recordModal").classList.remove("hidden");
-        }
-
-        // Delete Record
-        function deleteRecord(index) {
-            const item = maintenanceData[index];
-            if (confirm(`Apakah Anda yakin ingin menghapus site ${item.siteId} (${item.periodePM || 'PM1'}) dari daftar?`)) {
-                maintenanceData.splice(index, 1);
-                saveDataToStorage();
                 applyFilters();
                 updateKPIs();
-                showToast("Site maintenance berhasil dihapus!");
+                showToast("Site maintenance berhasil dihapus dari Cloud!");
             }
         }
 
@@ -1190,12 +1305,11 @@
             const wsData = [headers, sampleRow];
             const ws = XLSX.utils.aoa_to_sheet(wsData);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Template PM");
-            
+            XLSX.utils.book_append_sheet(wb, ws, "Template Bulk PM");
             XLSX.writeFile(wb, "Template_Bulk_Upload_PM.xlsx");
         }
 
-        // Process Excel Upload Logic (Upsert: Site ID + Periode PM) using SheetJS
+        // Process Excel Upload Logic (Upsert: Site ID + Periode PM) using SheetJS & Cloud Sync
         function processExcelUpload() {
             const fileInput = document.getElementById("excelFileInput");
             const file = fileInput.files[0];
@@ -1206,14 +1320,14 @@
             }
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 const data = new Uint8Array(e.target.result);
                 // Enable cellDates & raw formatting parsing for Excel
                 const workbook = XLSX.read(data, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 
-                // Convert worksheet to JSON rows with raw values so serial numbers or dates are handled properly
+                // Convert worksheet to JSON rows with raw values
                 const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true });
                 
                 if (rows.length <= 1) {
@@ -1223,6 +1337,7 @@
 
                 let insertedCount = 0;
                 let updatedCount = 0;
+                const upsertedList = [];
 
                 // Loop baris data Excel (mulai baris index 1 untuk melompati header)
                 for (let i = 1; i < rows.length; i++) {
@@ -1280,27 +1395,33 @@
                     };
 
                     // Upsert Logic: Cari kombinasi Site ID + Periode PM yang sama
-                    const existingIndex = maintenanceData.findIndex(item => 
+                    const existingIndex = window.maintenanceData.findIndex(item => 
                         String(item.siteId).toLowerCase() === siteId.toLowerCase() && 
                         String(item.periodePM) === periodePM
                     );
 
                     if (existingIndex >= 0) {
-                        recordData.no = maintenanceData[existingIndex].no;
-                        maintenanceData[existingIndex] = recordData;
+                        recordData.no = window.maintenanceData[existingIndex].no;
+                        window.maintenanceData[existingIndex] = recordData;
                         updatedCount++;
                     } else {
-                        recordData.no = maintenanceData.length + 1;
-                        maintenanceData.push(recordData);
+                        recordData.no = window.maintenanceData.length + 1;
+                        window.maintenanceData.push(recordData);
                         insertedCount++;
                     }
+
+                    upsertedList.push(recordData);
                 }
 
-                saveDataToStorage();
+                // Batch Save to Cloud Firestore
+                if (window.bulkSaveToCloud && upsertedList.length > 0) {
+                    await window.bulkSaveToCloud(upsertedList);
+                }
+
                 closeImportModal();
                 applyFilters();
                 updateKPIs();
-                showToast(`Bulk Excel Upload Berhasil! ${updatedCount} Diupdate, ${insertedCount} Ditambahkan.`);
+                showToast(`Bulk Excel Upload Cloud Berhasil! ${updatedCount} Diupdate, ${insertedCount} Ditambahkan.`);
             };
 
             reader.readAsArrayBuffer(file);
