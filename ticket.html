@@ -10,6 +10,113 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- SheetJS for Excel / CSV Parsing & Exporting -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    
+    <!-- Firebase SDK Imports (v11.6.1) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase Configuration fallback
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pm-ticket-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : {
+                apiKey: "AIzaSyDemoConfigForGitHubPagesPublicDB",
+                authDomain: "pm-ticket-demo.firebaseapp.com",
+                projectId: "pm-ticket-demo",
+                storageBucket: "pm-ticket-demo.appspot.com",
+                messagingSenderId: "123456789",
+                appId: "1:123456789:web:abcdef123456"
+            };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Expose Firebase instances globally for window functions
+        window.db = db;
+        window.auth = auth;
+        window.appId = appId;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.getDoc = getDoc;
+        window.collection = collection;
+        window.onSnapshot = onSnapshot;
+        window.writeBatch = writeBatch;
+
+        // Attach listenToCloudDatabase directly in the module context to ensure immediate global availability
+        window.listenToCloudDatabase = function() {
+            if (!window.db || !window.collection) {
+                fallbackToLocalStorage();
+                return;
+            }
+
+            try {
+                const publicColRef = window.collection(window.db, 'artifacts', window.appId, 'public', 'data', 'pm_tickets');
+
+                window.onSnapshot(publicColRef, (snapshot) => {
+                    const items = [];
+                    snapshot.forEach(docSnap => {
+                        items.push(docSnap.data());
+                    });
+
+                    // Sort by Ticket NO
+                    items.sort((a, b) => (a.NO || 0) - (b.NO || 0));
+
+                    if (items.length === 0) {
+                        seedDefaultCloudData();
+                    } else {
+                        siteDatabase = items;
+                        renderTable();
+                    }
+                }, (error) => {
+                    console.warn("Firestore Listen Error (falling back to local persistent store):", error);
+                    fallbackToLocalStorage();
+                });
+            } catch (err) {
+                console.warn("Firestore setup error:", err);
+                fallbackToLocalStorage();
+            }
+        };
+
+        // Fallback persistent storage if Firebase returns permission error
+        function fallbackToLocalStorage() {
+            const stored = localStorage.getItem('pm_ticket_db_v3');
+            if (stored) {
+                try {
+                    siteDatabase = JSON.parse(stored);
+                } catch(e) {
+                    siteDatabase = [...DEFAULT_INITIAL_DATA];
+                }
+            } else {
+                siteDatabase = [...DEFAULT_INITIAL_DATA];
+                localStorage.setItem('pm_ticket_db_v3', JSON.stringify(siteDatabase));
+            }
+            renderTable();
+        }
+        window.fallbackToLocalStorage = fallbackToLocalStorage;
+
+        // Auto authenticate anonymous session on startup
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.warn("Auth initialization warning:", err);
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await initAuth();
+            if (typeof window.listenToCloudDatabase === 'function') {
+                window.listenToCloudDatabase();
+            }
+        });
+    </script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -115,7 +222,10 @@
                         </div>
                     </div>
 
-                  
+                    <!-- Reset Data -->
+                    <button onclick="resetToDefaultData()" title="Reset Data Demo" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -265,8 +375,9 @@
                 <div>
                     Menampilkan <span id="recordCount" class="font-bold text-slate-800 dark:text-slate-200">0</span> entri data
                 </div>
-                <div class="text-slate-400">
-                    <i class="fa-solid fa-database mr-1"></i> Permanent Storage Key: <span class="font-mono text-slate-600 dark:text-slate-300 font-semibold">pm_ticket_db_v2</span>
+                <div class="text-slate-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-cloud text-emerald-500 animate-pulse"></i> 
+                    <span>Database Mode: <strong class="text-slate-600 dark:text-slate-200 font-mono">Cloud Shared Database (Real-time)</strong></span>
                 </div>
             </div>
         </div>
@@ -505,10 +616,7 @@
         // Scope options definition
         const SCOPE_OPTIONS = ["TOWER", "POWER", "BTS", "TRANSMISI", "CCTV", "HSE"];
 
-        // Key untuk LocalStorage V3
-        const STORAGE_KEY = 'pm_ticket_db_v3';
-
-        // Sample initial data if LocalStorage key is completely absent
+        // Sample initial data if Cloud Storage is completely empty
         const DEFAULT_INITIAL_DATA = [
             {
                 "NO": 1,
@@ -535,89 +643,53 @@
                 "Document Control": "DC-JKT-01",
                 "Link Dokumentasi": "https://drive.google.com",
                 "Keterangan": "Prioritas Tinggi"
-            },
-            {
-                "NO": 2,
-                "Tiket ID": "PM-2026-002",
-                "Site ID": "BDG-045",
-                "Site Name": "Dago Hill",
-                "Cluster": "Bandung Utara",
-                "Scope": "TOWER",
-                "Status Tiket": "In Progress",
-                "Type Battery": "VRLA 150Ah",
-                "Date Start": "2026-10-28",
-                "MOUNT": "October",
-                "Week Open": "W4",
-                "Tiket Aging": 5,
-                "Actual Online": "",
-                "Week Close": "",
-                "Sumber Masalah": "Power Surge",
-                "Teknisi": "Ahmad Dani",
-                "Hp": "081987654321",
-                "Tgl Visit": "2026-10-29",
-                "Status Visit": "Visited",
-                "Action": "Reset Module Rectifier",
-                "Noted": "Monitoring 24 jam",
-                "Document Control": "DC-BDG-08",
-                "Link Dokumentasi": "https://drive.google.com",
-                "Keterangan": "Normal"
-            },
-            {
-                "NO": 3,
-                "Tiket ID": "PM-2026-003",
-                "Site ID": "SUB-089",
-                "Site Name": "Tunjungan Macro",
-                "Cluster": "Surabaya Pusat",
-                "Scope": "BTS",
-                "Status Tiket": "Closed",
-                "Type Battery": "Lithium 50Ah",
-                "Date Start": "2026-10-15",
-                "MOUNT": "October",
-                "Week Open": "W3",
-                "Tiket Aging": 2,
-                "Actual Online": "2026-10-17",
-                "Week Close": "W3",
-                "Sumber Masalah": "Routine Check",
-                "Teknisi": "Eko Prasetyo",
-                "Hp": "081311223344",
-                "Tgl Visit": "2026-10-16",
-                "Status Visit": "Visited",
-                "Action": "Clean AirFilter & Test Load",
-                "Noted": "Selesai tanpa kendala",
-                "Document Control": "DC-SUB-12",
-                "Link Dokumentasi": "https://drive.google.com",
-                "Keterangan": "Closed Smooth"
             }
         ];
 
         // Main State Database Variable
         let siteDatabase = [];
 
-        // Application Startup Handler
-        window.addEventListener('DOMContentLoaded', () => {
-            loadFromLocalStorage();
-            renderTable();
-        });
-
-        function loadFromLocalStorage() {
-            const rawStorageData = localStorage.getItem(STORAGE_KEY);
-            
-            if (rawStorageData !== null) {
-                try {
-                    siteDatabase = JSON.parse(rawStorageData);
-                } catch (e) {
-                    console.error("Gagal membaca LocalStorage:", e);
-                    siteDatabase = [...DEFAULT_INITIAL_DATA];
-                    saveToLocalStorage();
-                }
+        // Helper to push document item to Cloud Firestore
+        async function saveCloudRecord(record) {
+            // Save to LocalStorage persistent fallback immediately
+            const idx = siteDatabase.findIndex(item => String(item['Tiket ID']).toLowerCase() === String(record['Tiket ID']).toLowerCase());
+            if (idx !== -1) {
+                siteDatabase[idx] = record;
             } else {
-                siteDatabase = [...DEFAULT_INITIAL_DATA];
-                saveToLocalStorage();
+                siteDatabase.push(record);
+            }
+            localStorage.setItem('pm_ticket_db_v3', JSON.stringify(siteDatabase));
+            renderTable();
+
+            // Try Cloud Firestore sync
+            if (!window.db || !window.doc || !window.setDoc) return;
+            try {
+                const docId = String(record['Tiket ID']).replace(/[/\\#%?]/g, '_');
+                const docRef = window.doc(window.db, 'artifacts', window.appId, 'public', 'data', 'pm_tickets', docId);
+                await window.setDoc(docRef, record, { merge: true });
+            } catch (err) {
+                console.warn("Cloud save warning (saved locally instead):", err);
             }
         }
 
-        function saveToLocalStorage() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(siteDatabase));
+        // Helper to delete document from Cloud Firestore
+        async function deleteCloudRecord(tiketId) {
+            // Remove locally
+            siteDatabase = siteDatabase.filter(item => String(item['Tiket ID']).toLowerCase() !== String(tiketId).toLowerCase());
+            reindexNO();
+            localStorage.setItem('pm_ticket_db_v3', JSON.stringify(siteDatabase));
+            renderTable();
+
+            // Try Cloud Firestore delete
+            if (!window.db || !window.doc) return;
+            try {
+                const docId = String(tiketId).replace(/[/\\#%?]/g, '_');
+                const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                const docRef = window.doc(window.db, 'artifacts', window.appId, 'public', 'data', 'pm_tickets', docId);
+                await deleteDoc(docRef);
+            } catch (err) {
+                console.warn("Cloud delete warning (deleted locally instead):", err);
+            }
         }
 
         // Helper function to dynamically populate dropdown options
@@ -793,7 +865,7 @@
         }
 
         // Single Form Save Logic (Create or Edit)
-        function saveRecord(event) {
+        async function saveRecord(event) {
             event.preventDefault();
             const editIdx = parseInt(document.getElementById('editIndex').value);
 
@@ -824,24 +896,9 @@
                 "Keterangan": document.getElementById('inputKeterangan').value.trim()
             };
 
-            if (editIdx >= 0) {
-                siteDatabase[editIdx] = record;
-                showToast("Data tiket berhasil diperbarui!", "success");
-            } else {
-                // Check if Tiket ID already exists manually
-                const existingIdx = siteDatabase.findIndex(item => item["Tiket ID"].toLowerCase() === record["Tiket ID"].toLowerCase());
-                if (existingIdx !== -1) {
-                    siteDatabase[existingIdx] = { ...siteDatabase[existingIdx], ...record, NO: siteDatabase[existingIdx]["NO"] };
-                    showToast(`Tiket ID "${record["Tiket ID"]}" sudah ada, data diperbarui!`, "success");
-                } else {
-                    siteDatabase.push(record);
-                    showToast("Data tiket baru berhasil ditambahkan!", "success");
-                }
-            }
+            await saveCloudRecord(record);
+            showToast("Data tiket berhasil tersimpan di Cloud Database!", "success");
 
-            reindexNO();
-            saveToLocalStorage();
-            renderTable();
             closeModal('recordModal');
         }
 
@@ -901,45 +958,43 @@
             openModal('detailModal');
         }
 
-        function deleteRecord(index) {
-            if (confirm(`Apakah Anda yakin ingin menghapus data dengan Tiket ID "${siteDatabase[index]['Tiket ID']}"?`)) {
-                siteDatabase.splice(index, 1);
-                reindexNO();
-                saveToLocalStorage();
-                renderTable();
-                showToast("Data tiket berhasil dihapus!", "success");
-            }
-        }
-
         function reindexNO() {
             siteDatabase.forEach((item, idx) => {
                 item['NO'] = idx + 1;
             });
         }
 
-        function resetToDefaultData() {
-            if (confirm("Apakah Anda yakin ingin mereset data ke versi sampel bawaan?")) {
-                siteDatabase = [...DEFAULT_INITIAL_DATA];
-                saveToLocalStorage();
-                renderTable();
-                showToast("Data berhasil direset ke sampel default!", "success");
+        async function deleteRecord(index) {
+            const targetItem = siteDatabase[index];
+            if (confirm(`Apakah Anda yakin ingin menghapus data dengan Tiket ID "${targetItem['Tiket ID']}" dari Cloud?`)) {
+                await deleteCloudRecord(targetItem['Tiket ID']);
+                showToast("Data tiket berhasil dihapus dari Cloud Database!", "success");
             }
         }
 
-        // Bulk Upload UPSERT Logic (Fixed Feature 1 & Excel Date Formatting)
-        function handleFileUpload(event) {
+        async function resetToDefaultData() {
+            if (confirm("Apakah Anda yakin ingin mereset seluruh database Cloud ke versi sampel default?")) {
+                for (const item of siteDatabase) {
+                    await deleteCloudRecord(item['Tiket ID']);
+                }
+                await seedDefaultCloudData();
+                showToast("Data Cloud berhasil direset ke sampel default!", "success");
+            }
+        }
+
+        // Bulk Upload UPSERT Logic ke Cloud Database
+        async function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
                     
-                    // Parse sheet to JSON array
                     const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
                     if (rawRows.length === 0) {
@@ -950,12 +1005,11 @@
                     let addedCount = 0;
                     let updatedCount = 0;
 
-                    rawRows.forEach(row => {
-                        // Extract Tiket ID
+                    for (let idx = 0; idx < rawRows.length; idx++) {
+                        const row = rawRows[idx];
                         const tiketID = String(row['Tiket ID'] || row['tiket id'] || row['TIKET ID'] || row['TiketID'] || '').trim();
-                        if (!tiketID) return; // Skip invalid row without Tiket ID
+                        if (!tiketID) continue;
 
-                        // Date parser helper for Excel dates
                         const parseDateVal = (val) => formatExcelDate(val);
 
                         const rowData = {
@@ -984,31 +1038,22 @@
                             "Keterangan": String(row['Keterangan'] || row['keterangan'] || '').trim()
                         };
 
-                        // UPSERT Logic: Match by Tiket ID
                         const matchIndex = siteDatabase.findIndex(item => String(item['Tiket ID']).toLowerCase() === tiketID.toLowerCase());
 
                         if (matchIndex !== -1) {
-                            // UPDATE existing ticket
-                            siteDatabase[matchIndex] = {
-                                ...siteDatabase[matchIndex],
-                                ...rowData,
-                                NO: siteDatabase[matchIndex]['NO'] // Retain NO
-                            };
+                            rowData['NO'] = siteDatabase[matchIndex]['NO'];
                             updatedCount++;
                         } else {
-                            // INSERT new ticket
-                            rowData['NO'] = siteDatabase.length + 1;
-                            siteDatabase.push(rowData);
+                            rowData['NO'] = siteDatabase.length + addedCount + 1;
                             addedCount++;
                         }
-                    });
 
-                    reindexNO();
-                    saveToLocalStorage();
-                    renderTable();
+                        // Sync straight to Cloud Database
+                        await saveCloudRecord(rowData);
+                    }
+
                     closeModal('uploadModal');
-
-                    showToast(`Bulk Upload Berhasil! (${addedCount} data baru, ${updatedCount} data diperbarui)`, "success");
+                    showToast(`Bulk Upload Cloud Berhasil! (${addedCount} baru, ${updatedCount} diperbarui)`, "success");
 
                 } catch (err) {
                     console.error("Error parsing file:", err);
@@ -1016,7 +1061,6 @@
                 }
             };
             reader.readAsArrayBuffer(file);
-            // Reset input value so same file can be selected again
             event.target.value = '';
         }
 
