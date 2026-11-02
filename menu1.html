@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard MSS 4G</title>
+    <title>Dashboard Monitoring Site SLA - Firebase Cloud Backend</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- SheetJS (XLSX) Library -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- Firebase SDK (v9 Compatibility Mode) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -29,8 +34,8 @@
                     <i data-lucide="radio" class="w-6 h-6"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg leading-tight tracking-wide">Dashboard Kebersihan& CCTV</h1>
-                    <p class="text-xs text-slate-400 font-normal">Sistem Laporan Kebersihan & CCTV SLA Harian / Mingguan</p>
+                    <h1 class="font-bold text-lg leading-tight tracking-wide">Dashboard Monitoring Site SLA</h1>
+                    <p class="text-xs text-slate-400 font-normal">Sistem Laporan Availabilitas (Database Cloud Sync Firebase)</p>
                 </div>
             </div>
 
@@ -65,6 +70,10 @@
                     <span>Export Data</span>
                 </button>
 
+                <button onclick="resetAllData()" class="flex items-center space-x-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold px-3 py-2 rounded-lg border border-rose-800/40 transition">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                    <span>Reset Data</span>
+                </button>
             </div>
         </div>
     </header>
@@ -72,21 +81,19 @@
     <!-- MAIN CONTENT -->
     <main class="max-w-[1700px] w-full mx-auto p-4 md:p-6 space-y-6 flex-grow">
 
-        <!-- FITUR 1: SUMMARY NOW STATUS CARDS (REAL-TIME STATUS SITES) -->
+        <!-- REALTIME SUMMARY NOW STATUS CARDS -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <!-- Total Sites -->
             <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-[11px] font-bold uppercase text-slate-400 tracking-wider">Total Site Active</p>
                     <h3 id="cardTotalSites" class="text-2xl font-black text-slate-800 mt-0.5">0</h3>
-                    <p class="text-[10px] text-slate-400 mt-1">Terdaftar di Sistem</p>
+                    <p class="text-[10px] text-slate-400 mt-1">Terdaftar di Cloud Database</p>
                 </div>
                 <div class="w-11 h-11 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center">
                     <i data-lucide="server" class="w-6 h-6"></i>
                 </div>
             </div>
 
-            <!-- Kebersihan: Clean vs Dirty -->
             <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-[11px] font-bold uppercase text-slate-400 tracking-wider">Kebersihan (Now)</p>
@@ -103,7 +110,6 @@
                 </div>
             </div>
 
-            <!-- CCTV Online -->
             <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-[11px] font-bold uppercase text-slate-400 tracking-wider">CCTV Online (Now)</p>
@@ -115,7 +121,6 @@
                 </div>
             </div>
 
-            <!-- Partial Issues (BLT/PTZ Off) -->
             <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-[11px] font-bold uppercase text-slate-400 tracking-wider">CCTV Partial Off</p>
@@ -127,7 +132,6 @@
                 </div>
             </div>
 
-            <!-- Critical Issues (Down/Total Off) -->
             <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-[11px] font-bold uppercase text-slate-400 tracking-wider">Site Down / Critical</p>
@@ -140,7 +144,7 @@
             </div>
         </div>
 
-        <!-- WEEKLY RANGE & INPUT TOOLBAR -->
+        <!-- WEEKLY RANGE TOOLBAR -->
         <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center space-x-2">
                 <div class="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
@@ -153,7 +157,6 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2.5 text-xs">
-                <!-- FITUR 2: BULK UPDATE WEEKLY MATRIX REPORT BUTTON -->
                 <button onclick="openWeeklyBulkModal()" class="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg shadow-sm transition">
                     <i data-lucide="file-up" class="w-3.5 h-3.5"></i>
                     <span>Upload Bulk Matrix</span>
@@ -175,8 +178,6 @@
 
         <!-- WEEKLY SUMMARY TABLES GRID -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            <!-- 1. SUMMARY MATRIX KEBERSIHAN -->
             <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
                 <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                     <div class="flex items-center space-x-2">
@@ -198,7 +199,6 @@
                 </div>
             </div>
 
-            <!-- 2. SUMMARY MATRIX CCTV -->
             <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
                 <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                     <div class="flex items-center space-x-2">
@@ -288,17 +288,12 @@
                 <div>
                     Menampilkan <span id="showingCount" class="font-bold text-slate-700">0</span> dari <span id="totalCount" class="font-bold text-slate-700">0</span> Site
                 </div>
-                <div class="flex items-center space-x-1.5">
-                    <button class="px-3 py-1.5 border border-slate-200 bg-white rounded-md text-slate-600 hover:bg-slate-50 font-medium">Previous</button>
-                    <button class="px-3 py-1.5 bg-blue-600 text-white rounded-md font-semibold shadow-sm">1</button>
-                    <button class="px-3 py-1.5 border border-slate-200 bg-white rounded-md text-slate-600 hover:bg-slate-50 font-medium">Next</button>
-                </div>
             </div>
         </div>
 
     </main>
 
-    <!-- FITUR 2 MODAL: BULK UPLOAD SUMMARY WEEKLY MATRIX REPORT -->
+    <!-- MODAL BULK MATRIX -->
     <div id="weeklyBulkModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100">
             <div class="flex justify-between items-center pb-4 border-b border-slate-100">
@@ -311,14 +306,12 @@
             </div>
             
             <div class="mt-4 space-y-4">
-                <p class="text-xs text-slate-500">
-                    Unggah file Excel/CSV rekap mingguan untuk memperbarui summary Kebersihan & CCTV secara kolektif.
-                </p>
-
+                <p class="text-xs text-slate-500">Unggah file Excel/CSV rekap mingguan untuk memperbarui summary Kebersihan & CCTV secara kolektif ke Cloud Database.</p>
+                
                 <div class="flex items-center justify-between bg-emerald-50 p-3 rounded-lg border border-emerald-200">
-                    <span class="text-xs font-semibold text-emerald-800">Belum punya format Excel-nya?</span>
+                    <span class="text-xs font-semibold text-emerald-800">Download Template Matrix?</span>
                     <button onclick="downloadWeeklyMatrixTemplate()" class="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1">
-                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Download Template Matrix
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Template Matrix
                     </button>
                 </div>
 
@@ -329,7 +322,6 @@
                             <i data-lucide="file-up" class="w-6 h-6"></i>
                         </div>
                         <p class="text-xs font-semibold text-slate-700">Klik untuk memilih file Matrix Excel/CSV</p>
-                        <p class="text-[11px] text-slate-400 mt-1">Kolom: WEEK, CLEAN, DIRTY, UNMONITORED, CCTV_ONLINE, BLT_OFF, PTZ_OFF, ALL_OFF, CCTV2_OFF, SITE_DOWN</p>
                     </div>
                 </div>
 
@@ -351,7 +343,7 @@
         </div>
     </div>
 
-    <!-- OTHER MODALS (SINGLE WEEKLY, SITE UPLOAD, ADD SITE) -->
+    <!-- MODAL INPUT SINGLE WEEK -->
     <div id="weeklyModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center pb-4 border-b border-slate-100">
@@ -367,20 +359,17 @@
                 <div class="bg-blue-50/60 p-3 rounded-xl border border-blue-100 flex items-center justify-between">
                     <div>
                         <label class="block font-bold text-slate-700">Pilih Minggu Target:</label>
-                        <p class="text-[11px] text-slate-400">Pilih minggu yang ada atau buat minggu baru</p>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <select id="modalWeekSelect" onchange="loadSelectedWeekToModal(this.value)" class="bg-white border border-slate-300 font-extrabold text-blue-700 px-3 py-1.5 rounded-lg text-sm shadow-sm outline-none"></select>
-                        <button type="button" onclick="createNewWeekOption()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg shadow-sm text-xs transition">
+                        <select id="modalWeekSelect" onchange="loadSelectedWeekToModal(this.value)" class="bg-white border border-slate-300 font-extrabold text-blue-700 px-3 py-1.5 rounded-lg text-sm outline-none"></select>
+                        <button type="button" onclick="createNewWeekOption()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition">
                             + Tambah Minggu
                         </button>
                     </div>
                 </div>
 
                 <div>
-                    <h4 class="font-extrabold text-slate-800 border-b border-slate-200 pb-1 mb-3 text-xs flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 1. Angka Kebersihan Site
-                    </h4>
+                    <h4 class="font-extrabold text-slate-800 border-b border-slate-200 pb-1 mb-3 text-xs">1. Angka Kebersihan Site</h4>
                     <div class="grid grid-cols-3 gap-3">
                         <div>
                             <label class="block font-semibold text-slate-600 mb-1">Sudah Dibersihkan</label>
@@ -398,9 +387,7 @@
                 </div>
 
                 <div>
-                    <h4 class="font-extrabold text-slate-800 border-b border-slate-200 pb-1 mb-3 text-xs flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span> 2. Angka Status CCTV
-                    </h4>
+                    <h4 class="font-extrabold text-slate-800 border-b border-slate-200 pb-1 mb-3 text-xs">2. Angka Status CCTV</h4>
                     <div class="grid grid-cols-3 gap-3">
                         <div>
                             <label class="block font-semibold text-slate-600 mb-1">CCTV Online</label>
@@ -431,7 +418,7 @@
 
                 <div class="flex items-center justify-between pt-4 border-t border-slate-100">
                     <button type="button" onclick="autoFillFromTable()" class="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center gap-1">
-                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Auto-Fill Hitung dari Tabel Bawah
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Hitung Otomatis dari Tabel
                     </button>
                     <div class="flex space-x-2">
                         <button type="button" onclick="closeWeeklyModal()" class="px-4 py-2 font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">Batal</button>
@@ -442,6 +429,7 @@
         </div>
     </div>
 
+    <!-- MODAL BULK UPLOAD SITE & ADD SITE -->
     <div id="uploadModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
             <div class="flex justify-between items-center pb-4 border-b border-slate-100">
@@ -454,24 +442,13 @@
             </div>
             
             <div class="mt-4 space-y-4">
-                <p class="text-xs text-slate-500">Unggah berkas Excel (<code class="text-blue-600 bg-blue-50 px-1 py-0.5 rounded">.xlsx</code>) atau <code class="text-blue-600 bg-blue-50 px-1 py-0.5 rounded">.csv</code>.</p>
-
                 <div id="dropZone" class="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 rounded-xl p-6 text-center cursor-pointer transition">
                     <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileSelect(event)">
-                    <div class="flex flex-col items-center">
-                        <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-2">
-                            <i data-lucide="file-up" class="w-6 h-6"></i>
-                        </div>
-                        <p class="text-xs font-semibold text-slate-700">Klik untuk memilih file atau tarik ke sini</p>
-                        <p class="text-[11px] text-slate-400 mt-1">Format didukung: XLSX, XLS, CSV</p>
-                    </div>
+                    <p class="text-xs font-semibold text-slate-700">Klik untuk memilih file Excel/CSV Site</p>
                 </div>
 
                 <div id="selectedFileInfo" class="hidden bg-slate-50 border border-slate-200 p-3 rounded-lg flex items-center justify-between">
-                    <div class="flex items-center space-x-2.5 overflow-hidden">
-                        <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-600 shrink-0"></i>
-                        <span id="fileName" class="text-xs font-semibold text-slate-700 truncate">data_site.xlsx</span>
-                    </div>
+                    <span id="fileName" class="text-xs font-semibold text-slate-700 truncate">data_site.xlsx</span>
                     <button onclick="removeSelectedFile()" class="text-slate-400 hover:text-rose-500">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
@@ -480,7 +457,7 @@
 
             <div class="mt-6 flex items-center justify-end space-x-2 pt-4 border-t border-slate-100">
                 <button onclick="closeUploadModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">Batal</button>
-                <button onclick="processUpload()" id="btnProcessUpload" disabled class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow-md transition">Import & Update Data</button>
+                <button onclick="processUpload()" id="btnProcessUpload" disabled class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow-md transition">Import & Cloud Sync</button>
             </div>
         </div>
     </div>
@@ -501,11 +478,11 @@
 
                 <div>
                     <label class="block font-semibold text-slate-600 mb-1">Site ID</label>
-                    <input type="text" required id="formSiteId" placeholder="PAP0029" class="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                    <input type="text" required id="formSiteId" placeholder="PAP0029" class="w-full p-2 border border-slate-200 rounded-lg outline-none">
                 </div>
                 <div>
                     <label class="block font-semibold text-slate-600 mb-1">Site Name</label>
-                    <input type="text" required id="formSiteName" placeholder="TOTOBERI" class="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                    <input type="text" required id="formSiteName" placeholder="TOTOBERI" class="w-full p-2 border border-slate-200 rounded-lg outline-none">
                 </div>
                 <div>
                     <label class="block font-semibold text-slate-600 mb-1">Opsel</label>
@@ -562,8 +539,25 @@
         </div>
     </div>
 
-    <!-- JAVASCRIPT LOGIC -->
+    <!-- JAVASCRIPT LOGIC DENGAN FIREBASE DB -->
     <script>
+        // ⚠️ BUKA FIREBASE CONSOLE DAN GANTI KONFIGURASI DI BAWAH INI DENGAN MILIK PROYEK ANDA ⚠️
+        const firebaseConfig = {
+            apiKey: "AIzaSyYOUR_API_KEY_HERE",
+            authDomain: "your-app.firebaseapp.com",
+            databaseURL: "https://your-app-default-rtdb.firebaseio.com",
+            projectId: "your-app",
+            storageBucket: "your-app.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+
+        // Inisialisasi Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
         const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
         function generateMonthOptions() {
@@ -582,99 +576,70 @@
             select.innerHTML = optionsHTML;
         }
 
-        function getDefaultWeeksForMonth(monthKey) {
-            const parts = monthKey.split('-');
-            const mIdx = monthNames.findIndex(m => m.toLowerCase() === parts[0]);
-            const approxStartWeek = Math.floor(mIdx * 4.33) + 1;
-            return [approxStartWeek, approxStartWeek + 1, approxStartWeek + 2, approxStartWeek + 3];
-        }
-
-        const defaultSites = [
-            { id: 1, siteId: 'PAP0029', siteName: 'TOTOBERI', opsel: 'TELKOMSEL', konsorsium: 'LA-HW-SEI', provinsi: 'PAPUA TENGAH', kab: 'NABIRE', kecamatan: 'WAPOGA', kebersihan: 'Sudah di bersihkan', cctv: 'Online' },
-            { id: 2, siteId: 'PAP0030', siteName: 'SAMANUI', opsel: 'TELKOMSEL', konsorsium: 'LA-HW-SEI', provinsi: 'PAPUA TENGAH', kab: 'NABIRE', kecamatan: 'WAPOGA', kebersihan: 'Sudah di bersihkan', cctv: 'Online' },
-            { id: 3, siteId: 'PAP0031', siteName: 'KAMARISANOI', opsel: 'TELKOMSEL', konsorsium: 'LA-HW-SEI', provinsi: 'PAPUA TENGAH', kab: 'NABIRE', kecamatan: 'WAPOGA', kebersihan: 'Sudah di bersihkan', cctv: 'Online' },
-            { id: 4, siteId: 'PAP0033', siteName: 'KEUW', opsel: 'TELKOMSEL', konsorsium: 'LA-HW-SEI', provinsi: 'PAPUA TENGAH', kab: 'NABIRE', kecamatan: 'WAPOGA', kebersihan: 'Sudah di bersihkan', cctv: 'Online' },
-            { id: 5, siteId: 'PAP0063', siteName: 'KOROMBOBI', opsel: 'TELKOMSEL', konsorsium: 'LA-HW-SEI', provinsi: 'PAPUA', kab: 'KEPULAUAN YAPEN', kecamatan: 'YAPEN TIMUR', kebersihan: 'Sudah di bersihkan', cctv: 'Online' }
-        ];
-
         let currentMonthKey = 'november-2026';
+        let monthState = {
+            weeks: [39, 40, 41, 42, 43, 44],
+            startWeek: 39,
+            endWeek: 44,
+            kebersihanMatrix: [
+                { category: 'Sudah Dibersihkan', color: 'bg-emerald-500', history: { 39: 73, 40: 74, 41: 76, 42: 77, 43: 80, 44: 83 } },
+                { category: 'Belum Dibersihkan', color: 'bg-amber-500', history: { 39: 111, 40: 107, 41: 105, 42: 104, 43: 101, 44: 99 } },
+                { category: 'Tidak Termonitor', color: 'bg-slate-500', history: { 39: 5, 40: 5, 41: 5, 42: 5, 43: 5, 44: 4 } }
+            ],
+            cctvMatrix: [
+                { category: 'CCTV Online', color: 'bg-emerald-500', history: { 39: 73, 40: 74, 41: 73, 42: 75, 43: 79, 44: 83 } },
+                { category: 'BLT OFF', color: 'bg-amber-500', history: { 39: 9, 40: 7, 41: 8, 42: 8, 43: 5, 44: 6 } },
+                { category: 'PTZ OFF', color: 'bg-amber-500', history: { 39: 7, 40: 7, 41: 7, 42: 6, 43: 5, 44: 5 } },
+                { category: 'NVR, BLT, PTZ Offline', color: 'bg-rose-500', history: { 39: 37, 40: 37, 41: 37, 42: 36, 43: 35, 44: 32 } },
+                { category: '2 CCTV Offline', color: 'bg-rose-500', history: { 39: 9, 40: 10, 41: 10, 42: 10, 43: 12, 44: 10 } },
+                { category: 'Site Down', color: 'bg-rose-600', history: { 39: 51, 40: 51, 41: 51, 42: 51, 43: 50, 44: 50 } }
+            ],
+            sites: []
+        };
+
         let selectedWeeklyFileRaw = null;
-
-        function getMonthStorageKey(monthKey, type) { return `sla_${monthKey}_${type}`; }
-
-        function loadMonthState(monthKey) {
-            const defaultWeeks = getDefaultWeeksForMonth(monthKey);
-            
-            let defaultKebersihan = [
-                { category: 'Sudah Dibersihkan', color: 'bg-emerald-500', history: {} },
-                { category: 'Belum Dibersihkan', color: 'bg-amber-500', history: {} },
-                { category: 'Tidak Termonitor', color: 'bg-slate-500', history: {} }
-            ];
-
-            let defaultCctv = [
-                { category: 'CCTV Online', color: 'bg-emerald-500', history: {} },
-                { category: 'BLT OFF', color: 'bg-amber-500', history: {} },
-                { category: 'PTZ OFF', color: 'bg-amber-500', history: {} },
-                { category: 'NVR, BLT, PTZ Offline', color: 'bg-rose-500', history: {} },
-                { category: '2 CCTV Offline', color: 'bg-rose-500', history: {} },
-                { category: 'Site Down', color: 'bg-rose-600', history: {} }
-            ];
-
-            if (monthKey === 'november-2026') {
-                defaultKebersihan[0].history = { 39: 73, 40: 74, 41: 76, 42: 77, 43: 80, 44: 83 };
-                defaultKebersihan[1].history = { 39: 111, 40: 107, 41: 105, 42: 104, 43: 101, 44: 99 };
-                defaultKebersihan[2].history = { 39: 5, 40: 5, 41: 5, 42: 5, 43: 5, 44: 4 };
-
-                defaultCctv[0].history = { 39: 73, 40: 74, 41: 73, 42: 75, 43: 79, 44: 83 };
-                defaultCctv[1].history = { 39: 9, 40: 7, 41: 8, 42: 8, 43: 5, 44: 6 };
-                defaultCctv[2].history = { 39: 7, 40: 7, 41: 7, 42: 6, 43: 5, 44: 5 };
-                defaultCctv[3].history = { 39: 37, 40: 37, 41: 37, 42: 36, 43: 35, 44: 32 };
-                defaultCctv[4].history = { 39: 9, 40: 10, 41: 10, 42: 10, 43: 12, 44: 10 };
-                defaultCctv[5].history = { 39: 51, 40: 51, 41: 51, 42: 51, 43: 50, 44: 50 };
-            }
-
-            const weeks = loadData(getMonthStorageKey(monthKey, 'weeks'), monthKey === 'november-2026' ? [39, 40, 41, 42, 43, 44] : defaultWeeks);
-            const kebersihan = loadData(getMonthStorageKey(monthKey, 'kebersihan'), defaultKebersihan);
-            const cctv = loadData(getMonthStorageKey(monthKey, 'cctv'), defaultCctv);
-            const sites = loadData(getMonthStorageKey(monthKey, 'sites'), defaultSites);
-
-            return {
-                weeks: weeks,
-                startWeek: weeks[0],
-                endWeek: weeks[weeks.length - 1],
-                kebersihanMatrix: kebersihan,
-                cctvMatrix: cctv,
-                sites: sites
-            };
-        }
-
-        function saveData(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
-        function loadData(key, defaultVal) {
-            const saved = localStorage.getItem(key);
-            if (saved) { try { return JSON.parse(saved); } catch(e) { return defaultVal; } }
-            return defaultVal;
-        }
-
-        let monthState = loadMonthState(currentMonthKey);
+        let selectedFileRaw = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             generateMonthOptions();
             lucide.createIcons();
-            populateWeekDropdowns();
-            renderDashboard();
+            listenToCloudFirebase(currentMonthKey);
             setupDragAndDrop();
             setupWeeklyDragAndDrop();
         });
 
+        // INTEGRASI REALTIME FIREBASE CLOUD DATABASE
+        function listenToCloudFirebase(monthKey) {
+            db.ref(`monitoring_sla/${monthKey}`).on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    monthState.weeks = data.weeks || [39, 40, 41, 42, 43, 44];
+                    monthState.startWeek = monthState.weeks[0];
+                    monthState.endWeek = monthState.weeks[monthState.weeks.length - 1];
+                    monthState.kebersihanMatrix = data.kebersihanMatrix || monthState.kebersihanMatrix;
+                    monthState.cctvMatrix = data.cctvMatrix || monthState.cctvMatrix;
+                    monthState.sites = data.sites || [];
+                }
+                populateWeekDropdowns();
+                renderDashboard();
+            });
+        }
+
+        function saveToCloudFirebase() {
+            db.ref(`monitoring_sla/${currentMonthKey}`).set({
+                weeks: monthState.weeks,
+                kebersihanMatrix: monthState.kebersihanMatrix,
+                cctvMatrix: monthState.cctvMatrix,
+                sites: monthState.sites
+            });
+        }
+
         function handleMonthChange(val) {
+            db.ref(`monitoring_sla/${currentMonthKey}`).off(); // Unsubscribe bulan sebelumnya
             currentMonthKey = val;
-            monthState = loadMonthState(currentMonthKey);
-            
             const monthText = document.getElementById('monthFilter').options[document.getElementById('monthFilter').selectedIndex].text;
             document.getElementById('activeMonthLabel').innerText = monthText;
-
-            populateWeekDropdowns();
-            renderDashboard();
+            listenToCloudFirebase(currentMonthKey);
         }
 
         function populateWeekDropdowns() {
@@ -692,7 +657,6 @@
             renderTable(filteredData);
         }
 
-        // LOGIKA FITUR 1: CALCULATE REALTIME NOW SUMMARY CARDS
         function renderNowSummaryCards() {
             const total = monthState.sites.length;
             let clean = 0, dirty = 0, unmonitored = 0;
@@ -767,14 +731,14 @@
                 `;
 
                 weekRange.forEach(w => {
-                    const val = item.history[w] !== undefined ? item.history[w] : 0;
+                    const val = (item.history && item.history[w] !== undefined) ? item.history[w] : 0;
                     totals[w] += val;
                     const isCurrent = (w === activeWeek);
                     bodyHTML += `<td class="py-2.5 px-3 text-center ${isCurrent ? 'bg-blue-50/70 font-extrabold text-slate-900' : 'text-slate-600'}">${val}</td>`;
                 });
 
-                const currentVal = item.history[activeWeek] || 0;
-                const prevVal = item.history[prevWeek] || 0;
+                const currentVal = (item.history && item.history[activeWeek]) || 0;
+                const prevVal = (item.history && item.history[prevWeek]) || 0;
                 const diff = currentVal - prevVal;
 
                 let statusBadge = `<span class="text-slate-400 font-bold">0</span>`;
@@ -798,7 +762,7 @@
             footerTr.innerHTML = footerHTML;
         }
 
-        // FITUR 2: BULK UPLOAD SUMMARY WEEKLY MATRIX LOGIC
+        // BULK MATRIX UPLOAD HANDLER
         function openWeeklyBulkModal() { document.getElementById('weeklyBulkModal').classList.remove('hidden'); }
         function closeWeeklyBulkModal() { document.getElementById('weeklyBulkModal').classList.add('hidden'); removeSelectedWeeklyFile(); }
 
@@ -837,14 +801,8 @@
         }
 
         function downloadWeeklyMatrixTemplate() {
-            const templateHeader = [[
-                'WEEK', 'CLEAN', 'DIRTY', 'UNMONITORED', 'CCTV_ONLINE', 'BLT_OFF', 'PTZ_OFF', 'ALL_OFF', 'CCTV2_OFF', 'SITE_DOWN'
-            ]];
-            const sampleData = [
-                [39, 73, 111, 5, 73, 9, 7, 37, 9, 51],
-                [40, 74, 107, 5, 74, 7, 7, 37, 10, 51]
-            ];
-
+            const templateHeader = [['WEEK', 'CLEAN', 'DIRTY', 'UNMONITORED', 'CCTV_ONLINE', 'BLT_OFF', 'PTZ_OFF', 'ALL_OFF', 'CCTV2_OFF', 'SITE_DOWN']];
+            const sampleData = [[39, 73, 111, 5, 73, 9, 7, 37, 9, 51]];
             const ws = XLSX.utils.aoa_to_sheet([...templateHeader, ...sampleData]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Template_Weekly_Matrix");
@@ -859,12 +817,10 @@
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: 0 });
+                    const jsonRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: 0 });
 
                     if (jsonRows.length === 0) { alert('File kosong.'); return; }
 
-                    let count = 0;
                     jsonRows.forEach(row => {
                         const getKey = (keys) => {
                             for (let k of Object.keys(row)) {
@@ -878,9 +834,17 @@
 
                         if (!monthState.weeks.includes(w)) monthState.weeks.push(w);
 
+                        if (!monthState.kebersihanMatrix[0].history) monthState.kebersihanMatrix[0].history = {};
+                        if (!monthState.kebersihanMatrix[1].history) monthState.kebersihanMatrix[1].history = {};
+                        if (!monthState.kebersihanMatrix[2].history) monthState.kebersihanMatrix[2].history = {};
+
                         monthState.kebersihanMatrix[0].history[w] = getKey(['CLEAN', 'SUDAH DIBERSIHKAN']);
                         monthState.kebersihanMatrix[1].history[w] = getKey(['DIRTY', 'BELUM DIBERSIHKAN']);
                         monthState.kebersihanMatrix[2].history[w] = getKey(['UNMONITORED', 'TIDAK TERMONITOR']);
+
+                        for (let i = 0; i < 6; i++) {
+                            if (!monthState.cctvMatrix[i].history) monthState.cctvMatrix[i].history = {};
+                        }
 
                         monthState.cctvMatrix[0].history[w] = getKey(['CCTV_ONLINE', 'CCTV ONLINE', 'ONLINE']);
                         monthState.cctvMatrix[1].history[w] = getKey(['BLT_OFF', 'BLT OFF']);
@@ -888,31 +852,24 @@
                         monthState.cctvMatrix[3].history[w] = getKey(['ALL_OFF', 'NVR_OFF', 'NVR, BLT, PTZ OFFLINE']);
                         monthState.cctvMatrix[4].history[w] = getKey(['CCTV2_OFF', '2 CCTV OFFLINE']);
                         monthState.cctvMatrix[5].history[w] = getKey(['SITE_DOWN', 'SITE DOWN']);
-
-                        count++;
                     });
 
                     monthState.weeks.sort((a,b) => a - b);
                     monthState.endWeek = Math.max(...monthState.weeks);
 
-                    saveData(getMonthStorageKey(currentMonthKey, 'weeks'), monthState.weeks);
-                    saveData(getMonthStorageKey(currentMonthKey, 'kebersihan'), monthState.kebersihanMatrix);
-                    saveData(getMonthStorageKey(currentMonthKey, 'cctv'), monthState.cctvMatrix);
-
-                    populateWeekDropdowns();
-                    renderDashboard();
+                    saveToCloudFirebase();
                     closeWeeklyBulkModal();
-                    alert(`Upload Berhasil! ${count} data mingguan berhasil dimasukkan ke Matrix.`);
+                    alert('Upload Matrix Berhasil! Data tersimpan di Cloud Firebase.');
 
                 } catch (err) {
                     console.error(err);
-                    alert('Gagal memproses file. Pastikan nama header kolom sesuai.');
+                    alert('Gagal memproses file Matrix.');
                 }
             };
             reader.readAsArrayBuffer(selectedWeeklyFileRaw);
         }
 
-        // OTHER HANDLERS
+        // OTHER FORM HANDLERS
         function openWeeklyModal() {
             const monthText = document.getElementById('monthFilter').options[document.getElementById('monthFilter').selectedIndex].text;
             document.getElementById('modalMonthTitle').innerText = monthText;
@@ -931,23 +888,22 @@
 
         function loadSelectedWeekToModal(w) {
             const weekNum = parseInt(w);
-            document.getElementById('w_clean').value = monthState.kebersihanMatrix[0].history[weekNum] || 0;
-            document.getElementById('w_dirty').value = monthState.kebersihanMatrix[1].history[weekNum] || 0;
-            document.getElementById('w_unmonitored').value = monthState.kebersihanMatrix[2].history[weekNum] || 0;
+            document.getElementById('w_clean').value = (monthState.kebersihanMatrix[0].history && monthState.kebersihanMatrix[0].history[weekNum]) || 0;
+            document.getElementById('w_dirty').value = (monthState.kebersihanMatrix[1].history && monthState.kebersihanMatrix[1].history[weekNum]) || 0;
+            document.getElementById('w_unmonitored').value = (monthState.kebersihanMatrix[2].history && monthState.kebersihanMatrix[2].history[weekNum]) || 0;
 
-            document.getElementById('w_cctvOnline').value = monthState.cctvMatrix[0].history[weekNum] || 0;
-            document.getElementById('w_bltOff').value = monthState.cctvMatrix[1].history[weekNum] || 0;
-            document.getElementById('w_ptzOff').value = monthState.cctvMatrix[2].history[weekNum] || 0;
-            document.getElementById('w_allOff').value = monthState.cctvMatrix[3].history[weekNum] || 0;
-            document.getElementById('w_cctv2Off').value = monthState.cctvMatrix[4].history[weekNum] || 0;
-            document.getElementById('w_siteDown').value = monthState.cctvMatrix[5].history[weekNum] || 0;
+            document.getElementById('w_cctvOnline').value = (monthState.cctvMatrix[0].history && monthState.cctvMatrix[0].history[weekNum]) || 0;
+            document.getElementById('w_bltOff').value = (monthState.cctvMatrix[1].history && monthState.cctvMatrix[1].history[weekNum]) || 0;
+            document.getElementById('w_ptzOff').value = (monthState.cctvMatrix[2].history && monthState.cctvMatrix[2].history[weekNum]) || 0;
+            document.getElementById('w_allOff').value = (monthState.cctvMatrix[3].history && monthState.cctvMatrix[3].history[weekNum]) || 0;
+            document.getElementById('w_cctv2Off').value = (monthState.cctvMatrix[4].history && monthState.cctvMatrix[4].history[weekNum]) || 0;
+            document.getElementById('w_siteDown').value = (monthState.cctvMatrix[5].history && monthState.cctvMatrix[5].history[weekNum]) || 0;
         }
 
         function createNewWeekOption() {
             const nextW = Math.max(...monthState.weeks) + 1;
             if (!monthState.weeks.includes(nextW)) {
                 monthState.weeks.push(nextW);
-                saveData(getMonthStorageKey(currentMonthKey, 'weeks'), monthState.weeks);
                 populateWeekDropdowns();
 
                 const modalSelect = document.getElementById('modalWeekSelect');
@@ -955,7 +911,6 @@
                 modalSelect.value = nextW;
 
                 autoFillFromTable();
-                alert(`Minggu Baru W${nextW} berhasil ditambahkan!`);
             }
         }
 
@@ -994,9 +949,17 @@
             e.preventDefault();
             const selectedW = parseInt(document.getElementById('modalWeekSelect').value);
 
+            if (!monthState.kebersihanMatrix[0].history) monthState.kebersihanMatrix[0].history = {};
+            if (!monthState.kebersihanMatrix[1].history) monthState.kebersihanMatrix[1].history = {};
+            if (!monthState.kebersihanMatrix[2].history) monthState.kebersihanMatrix[2].history = {};
+
             monthState.kebersihanMatrix[0].history[selectedW] = parseInt(document.getElementById('w_clean').value) || 0;
             monthState.kebersihanMatrix[1].history[selectedW] = parseInt(document.getElementById('w_dirty').value) || 0;
             monthState.kebersihanMatrix[2].history[selectedW] = parseInt(document.getElementById('w_unmonitored').value) || 0;
+
+            for (let i = 0; i < 6; i++) {
+                if (!monthState.cctvMatrix[i].history) monthState.cctvMatrix[i].history = {};
+            }
 
             monthState.cctvMatrix[0].history[selectedW] = parseInt(document.getElementById('w_cctvOnline').value) || 0;
             monthState.cctvMatrix[1].history[selectedW] = parseInt(document.getElementById('w_bltOff').value) || 0;
@@ -1007,28 +970,14 @@
 
             monthState.endWeek = selectedW;
 
-            saveData(getMonthStorageKey(currentMonthKey, 'kebersihan'), monthState.kebersihanMatrix);
-            saveData(getMonthStorageKey(currentMonthKey, 'cctv'), monthState.cctvMatrix);
-
-            populateWeekDropdowns();
-            renderDashboard();
+            saveToCloudFirebase();
             closeWeeklyModal();
-            alert(`Data Matrix untuk W${selectedW} berhasil disimpan!`);
+            alert(`Data Matrix W${selectedW} tersimpan ke Cloud!`);
         }
 
         function handleWeekRangeChange() {
-            const startVal = parseInt(document.getElementById('startWeekSelect').value);
-            const endVal = parseInt(document.getElementById('endWeekSelect').value);
-
-            if (startVal > endVal) {
-                alert('Minggu awal tidak boleh lebih besar dari minggu akhir.');
-                document.getElementById('startWeekSelect').value = monthState.startWeek;
-                document.getElementById('endWeekSelect').value = monthState.endWeek;
-                return;
-            }
-
-            monthState.startWeek = startVal;
-            monthState.endWeek = endVal;
+            monthState.startWeek = parseInt(document.getElementById('startWeekSelect').value);
+            monthState.endWeek = parseInt(document.getElementById('endWeekSelect').value);
             renderWeeklySummaries();
         }
 
@@ -1056,15 +1005,9 @@
         function applyFilters() { renderDashboard(); }
 
         function resetAllData() {
-            if (confirm('Apakah Anda yakin ingin mereset data bulan ini ke format awal?')) {
-                localStorage.removeItem(getMonthStorageKey(currentMonthKey, 'weeks'));
-                localStorage.removeItem(getMonthStorageKey(currentMonthKey, 'kebersihan'));
-                localStorage.removeItem(getMonthStorageKey(currentMonthKey, 'cctv'));
-                localStorage.removeItem(getMonthStorageKey(currentMonthKey, 'sites'));
-                
-                monthState = loadMonthState(currentMonthKey);
-                populateWeekDropdowns();
-                renderDashboard();
+            if (confirm('Apakah Anda yakin ingin mengosongkan/mereset data bulan ini di Cloud?')) {
+                db.ref(`monitoring_sla/${currentMonthKey}`).remove();
+                alert('Data bulan ini berhasil di-reset.');
             }
         }
 
@@ -1077,7 +1020,6 @@
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="11" class="py-12 text-center text-slate-400">
-                            <i data-lucide="folder-search" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
                             Tidak ada data site pada periode ini.
                         </td>
                     </tr>
@@ -1109,25 +1051,12 @@
                         <td class="py-3 px-4 text-slate-600">${site.provinsi}</td>
                         <td class="py-3 px-4 text-slate-600">${site.kab}</td>
                         <td class="py-3 px-4 font-semibold text-slate-800">${site.kecamatan}</td>
-                        
-                        <td class="py-3 px-4 text-center">
-                            <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${kebersihanBadge}">
-                                ${site.kebersihan}
-                            </span>
-                        </td>
-                        <td class="py-3 px-4 text-center">
-                            <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${cctvBadge}">
-                                ${site.cctv}
-                            </span>
-                        </td>
+                        <td class="py-3 px-4 text-center"><span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${kebersihanBadge}">${site.kebersihan}</span></td>
+                        <td class="py-3 px-4 text-center"><span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${cctvBadge}">${site.cctv}</span></td>
                         <td class="py-3 px-4 text-center">
                             <div class="flex items-center justify-center space-x-1">
-                                <button onclick="editSite(${site.id})" class="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition" title="Edit Site">
-                                    <i data-lucide="pencil" class="w-4 h-4"></i>
-                                </button>
-                                <button onclick="deleteSite(${site.id})" class="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition" title="Hapus Site">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                </button>
+                                <button onclick="editSite(${site.id})" class="text-blue-600 hover:text-blue-800 p-1"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                                <button onclick="deleteSite(${site.id})" class="text-slate-400 hover:text-rose-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                             </div>
                         </td>
                     </tr>
@@ -1158,22 +1087,15 @@
         }
 
         function deleteSite(id) {
-            if (confirm('Apakah Anda yakin ingin menghapus site ini?')) {
+            if (confirm('Hapus site ini dari Cloud Database?')) {
                 monthState.sites = monthState.sites.filter(s => s.id !== id);
-                saveData(getMonthStorageKey(currentMonthKey, 'sites'), monthState.sites);
-                renderDashboard();
+                saveToCloudFirebase();
             }
         }
 
         function downloadExcelTemplate() {
-            const templateHeader = [[
-                'NO', 'SITE ID', 'SITE NAME', 'OPSEL', 'KONSORSIUM', 'PROVINSI', 'KAB/KOTA', 'KECAMATAN', 'KEBERSIHAN', 'STATUS CCTV'
-            ]];
-            const sampleData = [
-                [1, 'PAP0029', 'TOTOBERI', 'TELKOMSEL', 'LA-HW-SEI', 'PAPUA TENGAH', 'NABIRE', 'WAPOGA', 'Sudah di bersihkan', 'Online'],
-                [2, 'PAP0030', 'SAMANUI', 'TELKOMSEL', 'LA-HW-SEI', 'PAPUA TENGAH', 'NABIRE', 'WAPOGA', 'Belum dibersihkan', '2 CCTV Offline']
-            ];
-
+            const templateHeader = [['NO', 'SITE ID', 'SITE NAME', 'OPSEL', 'KONSORSIUM', 'PROVINSI', 'KAB/KOTA', 'KECAMATAN', 'KEBERSIHAN', 'STATUS CCTV']];
+            const sampleData = [[1, 'PAP0029', 'TOTOBERI', 'TELKOMSEL', 'LA-HW-SEI', 'PAPUA TENGAH', 'NABIRE', 'WAPOGA', 'Sudah di bersihkan', 'Online']];
             const ws = XLSX.utils.aoa_to_sheet([...templateHeader, ...sampleData]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Template_Monitoring");
@@ -1183,23 +1105,14 @@
         function exportToExcel() {
             const filtered = filterData(monthState.sites);
             const exportData = filtered.map((site, idx) => ({
-                'NO': idx + 1,
-                'SITE ID': site.siteId,
-                'SITE NAME': site.siteName,
-                'OPSEL': site.opsel,
-                'KONSORSIUM': site.konsorsium,
-                'PROVINSI': site.provinsi,
-                'KAB/KOTA': site.kab,
-                'KECAMATAN': site.kecamatan,
-                'KEBERSIHAN': site.kebersihan,
-                'STATUS CCTV': site.cctv
+                'NO': idx + 1, 'SITE ID': site.siteId, 'SITE NAME': site.siteName, 'OPSEL': site.opsel,
+                'KONSORSIUM': site.konsorsium, 'PROVINSI': site.provinsi, 'KAB/KOTA': site.kab,
+                'KECAMATAN': site.kecamatan, 'KEBERSIHAN': site.kebersihan, 'STATUS CCTV': site.cctv
             }));
-
             const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Data_Site_SLA");
-            const currentMonthName = document.getElementById('monthFilter').options[document.getElementById('monthFilter').selectedIndex].text;
-            XLSX.writeFile(wb, `Export_Site_SLA_${currentMonthName.replace(/\s+/g, '_')}.xlsx`);
+            XLSX.writeFile(wb, `Export_Site_SLA_${currentMonthKey}.xlsx`);
         }
 
         function openUploadModal() { document.getElementById('uploadModal').classList.remove('hidden'); }
@@ -1226,33 +1139,30 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            monthState.selectedFileRaw = file;
+            selectedFileRaw = file;
             document.getElementById('fileName').innerText = file.name;
             document.getElementById('selectedFileInfo').classList.remove('hidden');
             document.getElementById('btnProcessUpload').disabled = false;
         }
 
         function removeSelectedFile() {
-            monthState.selectedFileRaw = null;
+            selectedFileRaw = null;
             document.getElementById('fileInput').value = '';
             document.getElementById('selectedFileInfo').classList.add('hidden');
             document.getElementById('btnProcessUpload').disabled = true;
         }
 
         function processUpload() {
-            if (!monthState.selectedFileRaw) return;
+            if (!selectedFileRaw) return;
 
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+                    const jsonRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' });
 
                     if (jsonRows.length === 0) { alert('File kosong.'); return; }
-
-                    let updatedCount = 0, addedCount = 0;
 
                     jsonRows.forEach((row, idx) => {
                         const getKey = (possibleKeys) => {
@@ -1281,17 +1191,14 @@
 
                         if (existingIndex !== -1) {
                             monthState.sites[existingIndex] = { ...monthState.sites[existingIndex], ...siteData };
-                            updatedCount++;
                         } else {
                             monthState.sites.push({ id: Date.now() + idx, ...siteData });
-                            addedCount++;
                         }
                     });
 
-                    saveData(getMonthStorageKey(currentMonthKey, 'sites'), monthState.sites);
-                    renderDashboard();
+                    saveToCloudFirebase();
                     closeUploadModal();
-                    alert(`Upload Site Berhasil!\n\n- ${updatedCount} diperbarui\n- ${addedCount} ditambahkan`);
+                    alert('Upload Site Berhasil! Data sudah tersimpan dan tersinkronisasi ke Cloud.');
 
                 } catch (error) {
                     console.error(error);
@@ -1299,7 +1206,7 @@
                 }
             };
 
-            reader.readAsArrayBuffer(monthState.selectedFileRaw);
+            reader.readAsBuffer ? reader.readAsArrayBuffer(selectedFileRaw) : reader.readAsBinaryString(selectedFileRaw);
         }
 
         function openAddSiteModal() {
@@ -1341,8 +1248,7 @@
                 else monthState.sites.unshift({ id: Date.now(), ...siteData });
             }
 
-            saveData(getMonthStorageKey(currentMonthKey, 'sites'), monthState.sites);
-            renderDashboard();
+            saveToCloudFirebase();
             closeAddSiteModal();
         }
     </script>
