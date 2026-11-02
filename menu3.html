@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preventive Maintenance Dashboard - Telecom Site Management</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- SheetJS CDN for Excel (.xlsx) Import & Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Fixed / Freeze Pane Styles (No, Site ID, Site Name) */
+        .sticky-col-1 { position: sticky; left: 0px; z-index: 20; }
+        .sticky-col-2 { position: sticky; left: 48px; z-index: 20; }
+        .sticky-col-3 { position: sticky; left: 148px; z-index: 20; box-shadow: 4px 0 6px -2px rgba(0,0,0,0.15); }
+        
+        .sticky-header-col-1 { position: sticky; left: 0px; z-index: 35; }
+        .sticky-header-col-2 { position: sticky; left: 48px; z-index: 35; }
+        .sticky-header-col-3 { position: sticky; left: 148px; z-index: 35; box-shadow: 4px 0 6px -2px rgba(0,0,0,0.25); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-brand-500 p-2 rounded-lg text-white">
+                    <i data-lucide="radio-tower" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold leading-tight">Preventive Maintenance Hub</h1>
+                    <p class="text-xs text-slate-400">Telecommunication Site Operation & Audit Dashboard</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="openModal()" class="flex items-center space-x-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-all shadow">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>Tambah Site PM</span>
+                </button>
+                <button onclick="openImportModal()" class="flex items-center space-x-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-all shadow">
+                    <i data-lucide="file-up" class="w-4 h-4"></i>
+                    <span>Import Bulk Excel</span>
+                </button>
+                <button onclick="exportToExcel()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-700 transition-all">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span>Export Excel</span>
+                </button>
+                <button onclick="resetToSampleData()" class="flex items-center space-x-1 bg-slate-800 hover:bg-rose-900 text-rose-300 hover:text-white text-xs font-semibold px-2.5 py-2 rounded-lg border border-slate-700 transition-all" title="Reset ke Dummy Data">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow p-4 sm:p-6 max-w-[1920px] mx-auto w-full space-y-6">
+
+        <!-- Baris Selector Periode PM1 vs PM2 untuk KPI Summary -->
+        <div class="bg-slate-900 text-white p-3 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+            <div class="flex items-center space-x-2">
+                <i data-lucide="sliders" class="w-4 h-4 text-brand-400"></i>
+                <span class="text-xs font-bold uppercase tracking-wider">Tampilan Ringkasan Summary KPI Periode:</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="kpiFilterAll" onclick="setKpiPeriodeFilter('ALL')" class="px-3 py-1 rounded-md text-xs font-bold transition-all bg-brand-600 text-white">Semua (PM1 + PM2)</button>
+                <button id="kpiFilterPM1" onclick="setKpiPeriodeFilter('PM1')" class="px-3 py-1 rounded-md text-xs font-bold transition-all bg-slate-800 text-slate-300 hover:bg-slate-700">Periode PM1</button>
+                <button id="kpiFilterPM2" onclick="setKpiPeriodeFilter('PM2')" class="px-3 py-1 rounded-md text-xs font-bold transition-all bg-slate-800 text-slate-300 hover:bg-slate-700">Periode PM2</button>
+            </div>
+        </div>
+
+        <!-- Executive KPI Cards Summary -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500">Total Site PM</p>
+                    <h3 class="text-2xl font-bold text-slate-800 mt-1" id="kpi-total">0</h3>
+                    <span class="text-[11px] text-slate-400">Terdaftar dalam Plan</span>
+                </div>
+                <div class="bg-blue-50 p-3 rounded-lg text-blue-600">
+                    <i data-lucide="database" class="w-6 h-6"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500">Progress Done</p>
+                    <h3 class="text-2xl font-bold text-emerald-600 mt-1" id="kpi-done">0</h3>
+                    <span class="text-[11px] text-emerald-500 font-medium" id="kpi-done-pct">0% Selesai</span>
+                </div>
+                <div class="bg-emerald-50 p-3 rounded-lg text-emerald-600">
+                    <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500">In Progress / Visit</p>
+                    <h3 class="text-2xl font-bold text-amber-600 mt-1" id="kpi-ongoing">0</h3>
+                    <span class="text-[11px] text-amber-500 font-medium">Sedang Berjalan</span>
+                </div>
+                <div class="bg-amber-50 p-3 rounded-lg text-amber-600">
+                    <i data-lucide="clock" class="w-6 h-6"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500">Pending / Replan</p>
+                    <h3 class="text-2xl font-bold text-rose-600 mt-1" id="kpi-pending">0</h3>
+                    <span class="text-[11px] text-rose-500 font-medium">Membutuhkan Reschedule</span>
+                </div>
+                <div class="bg-rose-50 p-3 rounded-lg text-rose-600">
+                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500">Doc Control Approved</p>
+                    <h3 class="text-2xl font-bold text-indigo-600 mt-1" id="kpi-approved">0</h3>
+                    <span class="text-[11px] text-indigo-500 font-medium">Dokumen Lengkap</span>
+                </div>
+                <div class="bg-indigo-50 p-3 rounded-lg text-indigo-600">
+                    <i data-lucide="file-check" class="w-6 h-6"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters & Tools Bar -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Search Bar -->
+                    <div class="relative w-full sm:w-64">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Cari Site ID / Nama / Teknisi..." class="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all">
+                    </div>
+
+                    <!-- Filter Periode PM (PM1 / PM2) -->
+                    <select id="filterPeriodePM" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold text-slate-700">
+                        <option value="">Semua Periode (PM1 & PM2)</option>
+                        <option value="PM1">Periode PM1</option>
+                        <option value="PM2">Periode PM2</option>
+                    </select>
+
+                    <!-- Filter Cluster -->
+                    <select id="filterCluster" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <option value="">Semua Cluster</option>
+                        <option value="Bandung Raya">Bandung Raya</option>
+                        <option value="Jakarta Selatan">Jakarta Selatan</option>
+                        <option value="Surabaya Barat">Surabaya Barat</option>
+                        <option value="Medan Kota">Medan Kota</option>
+                        <option value="Semarang Tengah">Semarang Tengah</option>
+                    </select>
+
+                    <!-- Filter Status Progress -->
+                    <select id="filterProgress" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <option value="">Semua Status Progress</option>
+                        <option value="DONE">DONE</option>
+                        <option value="IN PROGRESS">IN PROGRESS</option>
+                        <option value="PENDING">PENDING</option>
+                        <option value="REPLAN">REPLAN</option>
+                    </select>
+
+                    <!-- Filter Document Control -->
+                    <select id="filterDoc" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <option value="">Semua Status Dokumen</option>
+                        <option value="APPROVED">APPROVED</option>
+                        <option value="SUBMITTED">SUBMITTED</option>
+                        <option value="REJECTED">REJECTED</option>
+                        <option value="NOT YET">NOT YET</option>
+                    </select>
+
+                    <button onclick="resetFilters()" class="text-xs text-slate-500 hover:text-slate-800 flex items-center space-x-1 px-2 py-1">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        <span>Reset Filter</span>
+                    </button>
+                </div>
+
+                <div class="text-xs text-slate-500">
+                    Menampilkan <span id="recordCount" class="font-bold text-slate-800">0</span> dari <span id="totalRecordCount">0</span> data
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Data Table Container (33 Columns) -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="overflow-x-auto max-h-[600px] relative">
+                <table class="w-full text-xs text-left border-collapse min-w-[3200px]" id="pmTable">
+                    <!-- Table Header -->
+                    <thead class="bg-slate-800 text-slate-200 sticky top-0 z-30 uppercase font-semibold text-[11px] tracking-wider whitespace-nowrap">
+                        <tr>
+                            <!-- Freeze 3 Columns with Precise Dimension Alignment -->
+                            <th scope="col" class="px-3 py-3.5 min-w-[48px] max-w-[48px] text-center sticky-header-col-1 bg-slate-800">No</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[100px] max-w-[100px] sticky-header-col-2 bg-slate-800 border-r border-slate-700">Site ID</th>
+                            <th scope="col" class="px-4 py-3.5 min-w-[180px] max-w-[180px] sticky-header-col-3 bg-slate-800 border-r border-slate-700">Site Name</th>
+                            
+                            <!-- Maintenance Core Metadata -->
+                            <th scope="col" class="px-3 py-3.5 min-w-[110px] border-r border-slate-700">Periode PM</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[150px] border-r border-slate-700">Cluster</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[140px] border-r border-slate-700">Jenis Batterai</th>
+                            
+                            <!-- Sub-System Status Columns (Wider Column to fit 6 statuses) -->
+                            <th scope="col" class="px-3 py-3.5 min-w-[150px] text-center bg-slate-900 border-r border-slate-700">TOWER</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[150px] text-center bg-slate-900 border-r border-slate-700">POWER</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[150px] text-center bg-slate-900 border-r border-slate-700">BTS</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[150px] text-center bg-slate-900 border-r border-slate-700">TRANSMISI</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[150px] text-center bg-slate-900 border-r border-slate-700">CCTV</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[150px] text-center bg-slate-900 border-r border-slate-700">HSE</th>
+                            
+                            <!-- Schedule Planning Group -->
+                            <th scope="col" class="px-3 py-3.5 min-w-[120px]">Date Plan Awal</th>
+                            <th scope="col" class="px-2 py-3.5 min-w-[90px] text-center">W_D</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[120px]">Status Plan</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[120px]">Date Replan</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[120px]">Plan Actual</th>
+                            <th scope="col" class="px-3 py-3.5 min-w-[130px]">Status Plan (Act)</th>
+                            <th scope="col" class="px-2 py-3.5 min-w-[70px] text-center">Week</th>
+
+                            <!-- Execution Visit & Personnel Group -->
+                            <th scope="col" class="px-3 py-3 min-w-[120px] bg-slate-850">Tgl Visit</th>
+                            <th scope="col" class="px-2 py-3 min-w-[90px] text-center bg-slate-850">W_D</th>
+                            <th scope="col" class="px-3 py-3 min-w-[150px]">Teknisi</th>
+                            <th scope="col" class="px-3 py-3 min-w-[120px]">HP</th>
+                            <th scope="col" class="px-3 py-3 min-w-[140px]">Status Proggres</th>
+                            <th scope="col" class="px-4 py-3 min-w-[200px]">Noted</th>
+                            <th scope="col" class="px-3 py-3 min-w-[150px]">Document Control</th>
+
+                            <!-- Sub-System Actual Check Checklist Group -->
+                            <th scope="col" class="px-3 py-3 min-w-[110px] text-center bg-slate-900 border-l border-slate-700">TOWER (Chk)</th>
+                            <th scope="col" class="px-3 py-3 min-w-[110px] text-center bg-slate-900">POWER (Chk)</th>
+                            <th scope="col" class="px-3 py-3 min-w-[110px] text-center bg-slate-900">BTS (Chk)</th>
+                            <th scope="col" class="px-3 py-3 min-w-[120px] text-center bg-slate-900">TRANSMISI (Chk)</th>
+                            <th scope="col" class="px-3 py-3 min-w-[110px] text-center bg-slate-900">CCTV (Chk)</th>
+                            <th scope="col" class="px-3 py-3 min-w-[110px] text-center bg-slate-900 border-r border-slate-700">HSE (Chk)</th>
+
+                            <!-- Audit & Verification Group -->
+                            <th scope="col" class="px-3 py-3 min-w-[140px] text-center">Link Crosscheck</th>
+                            <th scope="col" class="px-4 py-3 min-w-[200px] border-r border-slate-700">Noted (Final)</th>
+                            <th scope="col" class="px-3 py-3 min-w-[100px] text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pmTableBody" class="divide-y divide-slate-200">
+                        <!-- Dynamic Rows Injected Here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table Pagination / Status Footer -->
+            <div class="bg-slate-50 px-4 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                <div id="paginationInfo">
+                    Menampilkan seluruh data tersaring
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Form for Add/Edit Site PM Record -->
+    <div id="recordModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4 border border-slate-200">
+            <!-- Modal Header -->
+            <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+                <h3 class="font-bold text-base flex items-center space-x-2">
+                    <i data-lucide="edit-3" class="w-5 h-5 text-brand-500"></i>
+                    <span id="modalTitle">Tambah Data Maintenance Site Baru</span>
+                </h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form Body -->
+            <form id="pmForm" onsubmit="saveRecord(event)" class="p-6 space-y-6">
+                <input type="hidden" id="editIndex" value="-1">
+                
+                <!-- Section 1: Data Utama Site -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase text-brand-600 tracking-wider mb-3 flex items-center gap-1.5">
+                        <i data-lucide="info" class="w-4 h-4"></i> Data Informasi Site & Baterai
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Periode PM *</label>
+                            <select id="formPeriodePM" required class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 font-bold bg-amber-50">
+                                <option value="PM1">PM1</option>
+                                <option value="PM2">PM2</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Site ID *</label>
+                            <input type="text" id="formSiteId" required class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="cth: BDU-012">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Site Name *</label>
+                            <input type="text" id="formSiteName" required class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="cth: Dago Highland">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Cluster *</label>
+                            <select id="formCluster" required class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                <option value="Bandung Raya">Bandung Raya</option>
+                                <option value="Jakarta Selatan">Jakarta Selatan</option>
+                                <option value="Surabaya Barat">Surabaya Barat</option>
+                                <option value="Medan Kota">Medan Kota</option>
+                                <option value="Semarang Tengah">Semarang Tengah</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Spesifikasi & Initial Sub-System -->
+                <div class="border-t border-slate-200 pt-4">
+                    <h4 class="text-xs font-bold uppercase text-brand-600 tracking-wider mb-3 flex items-center gap-1.5">
+                        <i data-lucide="cpu" class="w-4 h-4"></i> Kondisi Sub-Sistem Awal
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Jenis Baterai</label>
+                            <input type="text" id="formJenisBaterai" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500" placeholder="cth: Lithium 100Ah">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Tower</label>
+                            <select id="formTower" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="Approve KMT">Approve KMT</option>
+                                <option value="Rejected KMT">Rejected KMT</option>
+                                <option value="Approve TA">Approve TA</option>
+                                <option value="Rejected TA">Rejected TA</option>
+                                <option value="Uncomplete">Uncomplete</option>
+                                <option value="NY">NY</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Power</label>
+                            <select id="formPower" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="Approve KMT">Approve KMT</option>
+                                <option value="Rejected KMT">Rejected KMT</option>
+                                <option value="Approve TA">Approve TA</option>
+                                <option value="Rejected TA">Rejected TA</option>
+                                <option value="Uncomplete">Uncomplete</option>
+                                <option value="NY">NY</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">BTS</label>
+                            <select id="formBts" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="Approve KMT">Approve KMT</option>
+                                <option value="Rejected KMT">Rejected KMT</option>
+                                <option value="Approve TA">Approve TA</option>
+                                <option value="Rejected TA">Rejected TA</option>
+                                <option value="Uncomplete">Uncomplete</option>
+                                <option value="NY">NY</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Transmisi</label>
+                            <select id="formTransmisi" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="Approve KMT">Approve KMT</option>
+                                <option value="Rejected KMT">Rejected KMT</option>
+                                <option value="Approve TA">Approve TA</option>
+                                <option value="Rejected TA">Rejected TA</option>
+                                <option value="Uncomplete">Uncomplete</option>
+                                <option value="NY">NY</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">CCTV</label>
+                            <select id="formCctv" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="Approve KMT">Approve KMT</option>
+                                <option value="Rejected KMT">Rejected KMT</option>
+                                <option value="Approve TA">Approve TA</option>
+                                <option value="Rejected TA">Rejected TA</option>
+                                <option value="Uncomplete">Uncomplete</option>
+                                <option value="NY">NY</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Schedule & Planning -->
+                <div class="border-t border-slate-200 pt-4">
+                    <h4 class="text-xs font-bold uppercase text-brand-600 tracking-wider mb-3 flex items-center gap-1.5">
+                        <i data-lucide="calendar" class="w-4 h-4"></i> Schedule & Planning
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Date Plan Awal</label>
+                            <input type="date" id="formDatePlanAwal" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Status Plan</label>
+                            <select id="formStatusPlan" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="SCHEDULED">SCHEDULED</option>
+                                <option value="REPLAN">REPLAN</option>
+                                <option value="CANCELLED">CANCELLED</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Date Replan</label>
+                            <input type="date" id="formDateReplan" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Plan Actual</label>
+                            <input type="date" id="formPlanActual" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: Visit Execution & Teknisi -->
+                <div class="border-t border-slate-200 pt-4">
+                    <h4 class="text-xs font-bold uppercase text-brand-600 tracking-wider mb-3 flex items-center gap-1.5">
+                        <i data-lucide="user-check" class="w-4 h-4"></i> Eksekusi Kunjungan & Teknisi
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Tgl Visit</label>
+                            <input type="date" id="formTglVisit" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Nama Teknisi</label>
+                            <input type="text" id="formTeknisi" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg" placeholder="cth: Ahmad Rizki">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">No HP Teknisi</label>
+                            <input type="text" id="formHp" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg" placeholder="08123456789">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Status Progress</label>
+                            <select id="formStatusProgress" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg font-bold">
+                                <option value="DONE">DONE</option>
+                                <option value="IN PROGRESS">IN PROGRESS</option>
+                                <option value="PENDING">PENDING</option>
+                                <option value="REPLAN">REPLAN</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5: Actual Checklist & Doc Control -->
+                <div class="border-t border-slate-200 pt-4">
+                    <h4 class="text-xs font-bold uppercase text-brand-600 tracking-wider mb-3 flex items-center gap-1.5">
+                        <i data-lucide="check-square" class="w-4 h-4"></i> Checklist Verification & Audit
+                    </h4>
+                    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Tower Chk</label>
+                            <select id="formChkTower" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="PASS">PASS</option>
+                                <option value="FAIL">FAIL</option>
+                                <option value="N/A">N/A</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Power Chk</label>
+                            <select id="formChkPower" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="PASS">PASS</option>
+                                <option value="FAIL">FAIL</option>
+                                <option value="N/A">N/A</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">BTS Chk</label>
+                            <select id="formChkBts" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="PASS">PASS</option>
+                                <option value="FAIL">FAIL</option>
+                                <option value="N/A">N/A</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Transmisi Chk</label>
+                            <select id="formChkTransmisi" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="PASS">PASS</option>
+                                <option value="FAIL">FAIL</option>
+                                <option value="N/A">N/A</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">CCTV Chk</label>
+                            <select id="formChkCctv" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="PASS">PASS</option>
+                                <option value="FAIL">FAIL</option>
+                                <option value="N/A">N/A</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">HSE Chk</label>
+                            <select id="formChkHse" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="PASS">PASS</option>
+                                <option value="FAIL">FAIL</option>
+                                <option value="N/A">N/A</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Document Control Status</label>
+                            <select id="formDocControl" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg">
+                                <option value="APPROVED">APPROVED</option>
+                                <option value="SUBMITTED">SUBMITTED</option>
+                                <option value="REJECTED">REJECTED</option>
+                                <option value="NOT YET">NOT YET</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Link Crosscheck (Drive URL)</label>
+                            <input type="url" id="formLinkCrosscheck" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg" placeholder="https://drive.google.com/...">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Catatan Maintenance / Noted Final</label>
+                            <textarea id="formNotedFinal" rows="2" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg" placeholder="Masukkan catatan temuan atau penanganan..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Form Actions -->
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-lg shadow transition-all">Simpan Data Site</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Bulk Upload CSV / Excel -->
+    <div id="importModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl p-6 m-4 border border-slate-200">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-200 mb-4">
+                <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                    <i data-lucide="file-up" class="w-5 h-5 text-emerald-600"></i>
+                    <span>Bulk Upload & Update Site PM (Excel)</span>
+                </h3>
+                <button onclick="closeImportModal()" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs text-slate-600">
+                <div class="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg flex items-start space-x-2">
+                    <i data-lucide="info" class="w-4 h-4 mt-0.5 text-blue-600 flex-shrink-0"></i>
+                    <div>
+                        <strong class="font-semibold">Logika Upsert (Update if Exists, Insert if New):</strong>
+                        <p class="mt-0.5">Jika <span class="font-bold">Site ID</span> & <span class="font-bold">Periode PM</span> di file Excel sudah ada di database, data site tersebut akan di-update. Jika belum ada, akan dibuat baris baru.</p>
+                    </div>
+                </div>
+
+                <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center bg-slate-50 hover:bg-white transition-colors">
+                    <i data-lucide="file-spreadsheet" class="w-10 h-10 text-emerald-500 mx-auto mb-2"></i>
+                    <p class="font-medium text-slate-700">Pilih file Excel data maintenance (.xlsx / .xls)</p>
+                    <input type="file" id="excelFileInput" accept=".xlsx, .xls" class="mt-3 block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer">
+                </div>
+
+                <div class="flex items-center justify-between pt-2">
+                    <button type="button" onclick="downloadTemplateExcel()" class="inline-flex items-center space-x-1.5 text-emerald-700 hover:text-emerald-800 font-semibold text-xs">
+                        <i data-lucide="download-cloud" class="w-4 h-4"></i>
+                        <span>Download Format Template Excel (.xlsx)</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-slate-200">
+                <button type="button" onclick="closeImportModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg">Batal</button>
+                <button type="button" onclick="processExcelUpload()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg shadow">Proses Upload Excel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toasts Container -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 text-xs transform transition-all duration-300 translate-y-20 opacity-0 z-50">
+        <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+        <span id="toastMessage">Pesan Notifikasi</span>
+    </div>
+
+    <!-- Main Logic Script -->
+    <script>
+        // Key LocalStorage & Initial Sample Data Set
+        const STORAGE_KEY = "PM_HUB_DATA_V3";
+        let activeKpiPeriode = "ALL";
+
+        const sampleMaintenanceData = [
+            {
+                no: 1, siteId: "BDG-014", siteName: "Dago Superior Peak", periodePM: "PM1", cluster: "Bandung Raya", jenisBaterai: "Lithium 100Ah",
+                tower: "Approve KMT", power: "Approve KMT", bts: "Approve KMT", transmisi: "Approve TA", cctv: "Approve KMT", hse: "Approve KMT",
+                datePlanAwal: "2026-03-01", wdPlan: "W1-Senin", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "2026-03-01", statusPlanAct: "On Schedule", week: "W1",
+                tglVisit: "2026-03-01", wdVisit: "W1-Senin", teknisi: "Ahmad Rizki", hp: "081234567890", statusProgress: "DONE",
+                noted: "Pembersihan rectifier & penggantian grounding strip", docControl: "APPROVED",
+                chkTower: "PASS", chkPower: "PASS", chkBts: "PASS", chkTransmisi: "PASS", chkCctv: "PASS", chkHse: "PASS",
+                linkCrosscheck: "https://drive.google.com/drive/folders/pm-bdg-014", notedFinal: "Dokumen lengkap dan terverifikasi"
+            },
+            {
+                no: 2, siteId: "JKT-102", siteName: "Kuningan Hub Tower", periodePM: "PM1", cluster: "Jakarta Selatan", jenisBaterai: "VRLA 150Ah",
+                tower: "Approve KMT", power: "Rejected KMT", bts: "Approve TA", transmisi: "Approve TA", cctv: "Uncomplete", hse: "Approve KMT",
+                datePlanAwal: "2026-03-02", wdPlan: "W1-Selasa", statusPlan: "REPLAN", dateReplan: "2026-03-05", planActual: "2026-03-05", statusPlanAct: "Delayed", week: "W1",
+                tglVisit: "2026-03-05", wdVisit: "W1-Kamis", teknisi: "Budi Santoso", hp: "081987654321", statusProgress: "DONE",
+                noted: "Modul CCTV mengalami mati total, power module diganti", docControl: "SUBMITTED",
+                chkTower: "PASS", chkPower: "PASS", chkBts: "PASS", chkTransmisi: "PASS", chkCctv: "FAIL", chkHse: "PASS",
+                linkCrosscheck: "https://drive.google.com/drive/folders/pm-jkt-102", notedFinal: "Menunggu penggantian fisik CCTV"
+            },
+            {
+                no: 3, siteId: "BDG-014", siteName: "Dago Superior Peak", periodePM: "PM2", cluster: "Bandung Raya", jenisBaterai: "Lithium 100Ah",
+                tower: "NY", power: "NY", bts: "NY", transmisi: "NY", cctv: "NY", hse: "NY",
+                datePlanAwal: "2026-09-01", wdPlan: "W1-Senin", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "-", statusPlanAct: "Pending", week: "W35",
+                tglVisit: "-", wdVisit: "-", teknisi: "Ahmad Rizki", hp: "081234567890", statusProgress: "IN PROGRESS",
+                noted: "Persiapan material PM Siklus 2", docControl: "NOT YET",
+                chkTower: "N/A", chkPower: "N/A", chkBts: "N/A", chkTransmisi: "N/A", chkCctv: "N/A", chkHse: "N/A",
+                linkCrosscheck: "", notedFinal: "Schedule awal PM2"
+            },
+            {
+                no: 4, siteId: "SUB-045", siteName: "Rungkut Industrial", periodePM: "PM1", cluster: "Surabaya Barat", jenisBaterai: "Lithium 150Ah",
+                tower: "Approve TA", power: "Approve KMT", bts: "Approve KMT", transmisi: "Approve KMT", cctv: "Approve TA", hse: "Approve KMT",
+                datePlanAwal: "2026-03-03", wdPlan: "W1-Rabu", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "2026-03-03", statusPlanAct: "On Schedule", week: "W1",
+                tglVisit: "2026-03-03", wdVisit: "W1-Rabu", teknisi: "Eko Prasetyo", hp: "085678901234", statusProgress: "DONE",
+                noted: "Pengecekan rutin berjalan lancar", docControl: "APPROVED",
+                chkTower: "PASS", chkPower: "PASS", chkBts: "PASS", chkTransmisi: "PASS", chkCctv: "PASS", chkHse: "PASS",
+                linkCrosscheck: "https://drive.google.com/drive/folders/pm-sub-045", notedFinal: "Verified OK"
+            },
+            {
+                no: 5, siteId: "MDN-201", siteName: "Medan Fair Plaza", periodePM: "PM2", cluster: "Medan Kota", jenisBaterai: "VRLA 200Ah",
+                tower: "Rejected TA", power: "Approve KMT", bts: "Approve KMT", transmisi: "Uncomplete", cctv: "NY", hse: "Approve KMT",
+                datePlanAwal: "2026-09-10", wdPlan: "W2-Kamis", statusPlan: "SCHEDULED", dateReplan: "-", planActual: "-", statusPlanAct: "Pending", week: "W36",
+                tglVisit: "-", wdVisit: "-", teknisi: "Doni Siregar", hp: "081345678901", statusProgress: "PENDING",
+                noted: "Akses lokasi sedang disiapkan", docControl: "NOT YET",
+                chkTower: "N/A", chkPower: "N/A", chkBts: "N/A", chkTransmisi: "N/A", chkCctv: "N/A", chkHse: "N/A",
+                linkCrosscheck: "", notedFinal: "Menunggu izin masuk"
+            }
+        ];
+
+        // Load persisted data or default to sample
+        let maintenanceData = loadDataFromStorage();
+        let filteredData = [...maintenanceData];
+
+        // Persistent Data Load & Save logic
+        function loadDataFromStorage() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    return JSON.parse(stored);
+                }
+            } catch (err) {
+                console.error("Gagal membaca LocalStorage:", err);
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleMaintenanceData));
+            return sampleMaintenanceData;
+        }
+
+        function saveDataToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(maintenanceData));
+            } catch (err) {
+                console.error("Gagal menyimpan ke LocalStorage:", err);
+            }
+        }
+
+        function resetToSampleData() {
+            if (confirm("Apakah Anda yakin ingin me-reset data kembali ke data sampel awal? Data lokal yang baru ditambahkan/di-import akan hilang.")) {
+                maintenanceData = JSON.parse(JSON.stringify(sampleMaintenanceData));
+                saveDataToStorage();
+                applyFilters();
+                updateKPIs();
+                showToast("Data berhasil di-reset ke sampel awal!");
+            }
+        }
+
+        // Initialize App on DOM Load
+        document.addEventListener("DOMContentLoaded", () => {
+            renderTable();
+            updateKPIs();
+            lucide.createIcons();
+        });
+
+        // Helper Badge UI Renderers
+        function renderOkStatus(status) {
+            if (!status || status === '-' || status === 'N/A') return '<span class="text-slate-400 font-normal">-</span>';
+            
+            const upper = status.trim();
+            if (upper === 'Approve KMT') {
+                return '<span class="px-2.5 py-1 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-block whitespace-nowrap">Approve KMT</span>';
+            }
+            if (upper === 'Rejected KMT') {
+                return '<span class="px-2.5 py-1 rounded text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 inline-block whitespace-nowrap">Rejected KMT</span>';
+            }
+            if (upper === 'Approve TA') {
+                return '<span class="px-2.5 py-1 rounded text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-300 inline-block whitespace-nowrap">Approve TA</span>';
+            }
+            if (upper === 'Rejected TA') {
+                return '<span class="px-2.5 py-1 rounded text-[11px] font-bold bg-pink-100 text-pink-800 border border-pink-300 inline-block whitespace-nowrap">Rejected TA</span>';
+            }
+            if (upper === 'Uncomplete') {
+                return '<span class="px-2.5 py-1 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 inline-block whitespace-nowrap">Uncomplete</span>';
+            }
+            if (upper === 'NY') {
+                return '<span class="px-2.5 py-1 rounded text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-300 inline-block whitespace-nowrap">NY</span>';
+            }
+            
+            return `<span class="px-2.5 py-1 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 inline-block whitespace-nowrap">${status}</span>`;
+        }
+
+        function renderPlanBadge(status) {
+            if (!status || status === '-') return '<span class="text-slate-400">-</span>';
+            if (status === 'SCHEDULED') return '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">SCHEDULED</span>';
+            if (status === 'REPLAN') return '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">REPLAN</span>';
+            return `<span class="text-slate-600">${status}</span>`;
+        }
+
+        // Helper Render Badge STATUS PLAN (ACT)
+        function renderStatusPlanActBadge(status) {
+            if (!status || status === '-') return '<span class="text-slate-400 font-normal">-</span>';
+            const upper = status.trim().toUpperCase();
+            
+            if (upper === 'ON SCHEDULE') {
+                return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-block">On Schedule</span>';
+            }
+            if (upper === 'ADVANCE' || upper === 'AHEAD') {
+                return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300 inline-block">Advance</span>';
+            }
+            if (upper === 'DELAY' || upper === 'OVERDUE' || upper === 'DELAYED') {
+                return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 inline-block">Delay</span>';
+            }
+            if (upper === 'RESCHEDULED' || upper === 'REPLAN') {
+                return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 inline-block">Rescheduled</span>';
+            }
+            if (upper === 'PENDING') {
+                return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300 inline-block">Pending</span>';
+            }
+            return `<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 inline-block">${status}</span>`;
+        }
+
+        // Helper Auto Calculate STATUS PLAN (ACT)
+        function computeStatusPlanAct(datePlanAwal, dateReplan, planActual, tglVisit) {
+            // Mengacu KHUSUS pada Plan Actual dan Date Replan (Tgl Visit hanya sebagai info)
+            const actualDateStr = (planActual && planActual !== '-' && planActual !== '') ? planActual : null;
+            const targetDateStr = (dateReplan && dateReplan !== '-' && dateReplan !== '') ? dateReplan : ((datePlanAwal && datePlanAwal !== '-' && datePlanAwal !== '') ? datePlanAwal : null);
+
+            // JIKA BELUM ADA PLAN ACTUAL (Plan Actual Kosong / "-")
+            if (!actualDateStr) {
+                // Jika ada jadwal Replan, statusnya Rescheduled
+                if (dateReplan && dateReplan !== '-' && dateReplan !== '') return "Rescheduled";
+                // Jika tidak ada Replan dan belum ada Plan Actual, statusnya Pending
+                return "Pending";
+            }
+
+            // JIKA SUDAH ADA PLAN ACTUAL
+            if (!targetDateStr) return "On Schedule";
+
+            const actual = new Date(actualDateStr);
+            const target = new Date(targetDateStr);
+
+            if (isNaN(actual.getTime()) || isNaN(target.getTime())) return "On Schedule";
+
+            // Strip time for exact date comparison
+            actual.setHours(0,0,0,0);
+            target.setHours(0,0,0,0);
+
+            const diffTime = actual.getTime() - target.getTime();
+            if (diffTime === 0) return "On Schedule";
+            if (diffTime < 0) return "Advance"; // Advance hanya jika Plan Actual lebih awal dari Date Replan / Plan Awal
+            return "Delay";
+        }
+
+        function renderProgressBadge(status) {
+            if (!status) return '<span class="text-slate-400">-</span>';
+            if (status === 'DONE') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center w-max gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>DONE</span>';
+            if (status === 'IN PROGRESS') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center w-max gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>IN PROGRESS</span>';
+            if (status === 'PENDING') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300 flex items-center w-max gap-1"><span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>PENDING</span>';
+            return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">${status}</span>`;
+        }
+
+        function renderDocBadge(status) {
+            if (!status || status === 'NOT YET') return '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200">NOT YET</span>';
+            if (status === 'APPROVED') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">APPROVED</span>';
+            if (status === 'SUBMITTED') return '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-100 text-sky-700 border border-sky-200">SUBMITTED</span>';
+            return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">${status}</span>`;
+        }
+
+        function renderPassFailBadge(status) {
+            if (!status || status === 'N/A' || status === '-') return '<span class="text-slate-400 font-normal">-</span>';
+            if (status === 'PASS') return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-300">PASS</span>';
+            return '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-300">FAIL</span>';
+        }
+
+        // Modal Controls
+        function openModal() {
+            document.getElementById("pmForm").reset();
+            document.getElementById("editIndex").value = "-1";
+            document.getElementById("modalTitle").innerText = "Tambah Data Maintenance Site Baru";
+            document.getElementById("recordModal").classList.remove("hidden");
+        }
+
+        function closeModal() {
+            document.getElementById("recordModal").classList.add("hidden");
+        }
+
+        function openImportModal() {
+            document.getElementById("excelFileInput").value = "";
+            document.getElementById("importModal").classList.remove("hidden");
+        }
+
+        function closeImportModal() {
+            document.getElementById("importModal").classList.add("hidden");
+        }
+
+        // KPI Periode Switch Handler
+        function setKpiPeriodeFilter(periode) {
+            activeKpiPeriode = periode;
+            
+            const btnAll = document.getElementById("kpiFilterAll");
+            const btnPM1 = document.getElementById("kpiFilterPM1");
+            const btnPM2 = document.getElementById("kpiFilterPM2");
+
+            const activeClass = "bg-brand-600 text-white font-bold";
+            const inactiveClass = "bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold";
+
+            btnAll.className = `px-3 py-1 rounded-md text-xs transition-all ${periode === 'ALL' ? activeClass : inactiveClass}`;
+            btnPM1.className = `px-3 py-1 rounded-md text-xs transition-all ${periode === 'PM1' ? activeClass : inactiveClass}`;
+            btnPM2.className = `px-3 py-1 rounded-md text-xs transition-all ${periode === 'PM2' ? activeClass : inactiveClass}`;
+
+            updateKPIs();
+        }
+
+        // Update Summary KPI Cards
+        function updateKPIs() {
+            let dataForKpi = maintenanceData;
+            if (activeKpiPeriode !== "ALL") {
+                dataForKpi = maintenanceData.filter(item => item.periodePM === activeKpiPeriode);
+            }
+
+            const total = dataForKpi.length;
+            const done = dataForKpi.filter(d => d.statusProgress === "DONE").length;
+            const ongoing = dataForKpi.filter(d => d.statusProgress === "IN PROGRESS").length;
+            const pending = dataForKpi.filter(d => d.statusProgress === "PENDING" || d.statusProgress === "REPLAN").length;
+            const approved = dataForKpi.filter(d => d.docControl === "APPROVED").length;
+
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+            document.getElementById("kpi-total").innerText = total;
+            document.getElementById("kpi-done").innerText = done;
+            document.getElementById("kpi-done-pct").innerText = `${pct}% Selesai`;
+            document.getElementById("kpi-ongoing").innerText = ongoing;
+            document.getElementById("kpi-pending").innerText = pending;
+            document.getElementById("kpi-approved").innerText = approved;
+        }
+
+        // Render Main Data Table
+        function renderTable() {
+            const tbody = document.getElementById("pmTableBody");
+            tbody.innerHTML = "";
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="34" class="px-6 py-8 text-center text-slate-400 italic">
+                            Tidak ada data maintenance site yang ditemukan sesuai kriteria filter.
+                        </td>
+                    </tr>
+                `;
+                document.getElementById("recordCount").innerText = 0;
+                document.getElementById("totalRecordCount").innerText = maintenanceData.length;
+                return;
+            }
+
+            filteredData.forEach((row, index) => {
+                const originalIndex = maintenanceData.findIndex(item => item.siteId === row.siteId && item.periodePM === row.periodePM);
+                const tr = document.createElement("tr");
+                
+                // Set solid cell backgrounds for frozen columns to avoid text overlay transparency issues
+                const cellBgClass = index % 2 === 0 ? "bg-white" : "bg-slate-50";
+                tr.className = `${cellBgClass} hover:bg-sky-50/50 transition-colors whitespace-nowrap`;
+
+                const isPm1 = row.periodePM === 'PM1';
+                const periodeBadgeClass = isPm1 ? "bg-blue-100 text-blue-800 border-blue-300" : "bg-purple-100 text-purple-800 border-purple-300";
+
+                // Auto calculate status plan (act) if missing
+                const calcStatusPlanAct = row.statusPlanAct && row.statusPlanAct !== '-' && row.statusPlanAct !== 'Updated'
+                    ? row.statusPlanAct 
+                    : computeStatusPlanAct(row.datePlanAwal, row.dateReplan, row.planActual, row.tglVisit);
+
+                tr.innerHTML = `
+                    <td class="px-3 py-2.5 text-center sticky-col-1 ${cellBgClass} font-semibold text-slate-500 min-w-[48px] max-w-[48px]">${index + 1}</td>
+                    <td class="px-3 py-2.5 sticky-col-2 ${cellBgClass} font-bold text-slate-900 border-r border-slate-200 min-w-[100px] max-w-[100px] truncate" title="${row.siteId || ''}">${row.siteId || '-'}</td>
+                    <td class="px-4 py-2.5 sticky-col-3 ${cellBgClass} font-medium text-slate-800 border-r border-slate-200 min-w-[180px] max-w-[180px] truncate" title="${row.siteName || ''}">${row.siteName || '-'}</td>
+                    
+                    <td class="px-3 py-2.5 border-r border-slate-200">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold border ${periodeBadgeClass}">${row.periodePM || 'PM1'}</span>
+                    </td>
+                    <td class="px-3 py-2.5 border-r border-slate-200">${row.cluster || '-'}</td>
+                    <td class="px-3 py-2.5 border-r border-slate-200 text-slate-600">${row.jenisBaterai || '-'}</td>
+                    
+                    <td class="px-3 py-2.5 text-center border-r border-slate-200">${renderOkStatus(row.tower)}</td>
+                    <td class="px-3 py-2.5 text-center border-r border-slate-200">${renderOkStatus(row.power)}</td>
+                    <td class="px-3 py-2.5 text-center border-r border-slate-200">${renderOkStatus(row.bts)}</td>
+                    <td class="px-3 py-2.5 text-center border-r border-slate-200">${renderOkStatus(row.transmisi)}</td>
+                    <td class="px-3 py-2.5 text-center border-r border-slate-200">${renderOkStatus(row.cctv)}</td>
+                    <td class="px-3 py-2.5 text-center border-r border-slate-200">${renderOkStatus(row.hse)}</td>
+
+                    <td class="px-3 py-2.5">${row.datePlanAwal || '-'}</td>
+                    <td class="px-2 py-2.5 text-center text-slate-400 font-mono">${row.wdPlan || '-'}</td>
+                    <td class="px-3 py-2.5">${renderPlanBadge(row.statusPlan)}</td>
+                    <td class="px-3 py-2.5 text-slate-600">${row.dateReplan || '-'}</td>
+                    <td class="px-3 py-2.5 text-slate-600">${row.planActual || '-'}</td>
+                    <td class="px-3 py-2.5 text-center">${renderStatusPlanActBadge(calcStatusPlanAct)}</td>
+                    <td class="px-2 py-2.5 text-center font-semibold text-slate-500">${row.week || '-'}</td>
+
+                    <td class="px-3 py-2.5 font-medium">${row.tglVisit || '-'}</td>
+                    <td class="px-2 py-2.5 text-center text-slate-400 font-mono">${row.wdVisit || '-'}</td>
+                    <td class="px-3 py-2.5 font-medium text-slate-800">${row.teknisi || '-'}</td>
+                    <td class="px-3 py-2.5 text-slate-500">${row.hp || '-'}</td>
+                    <td class="px-3 py-2.5">${renderProgressBadge(row.statusProgress)}</td>
+                    <td class="px-4 py-2.5 text-slate-600 truncate max-w-xs" title="${row.noted || ''}">${row.noted || '-'}</td>
+                    <td class="px-3 py-2.5">${renderDocBadge(row.docControl)}</td>
+
+                    <td class="px-3 py-2.5 text-center border-l border-slate-200">${renderPassFailBadge(row.chkTower)}</td>
+                    <td class="px-3 py-2.5 text-center">${renderPassFailBadge(row.chkPower)}</td>
+                    <td class="px-3 py-2.5 text-center">${renderPassFailBadge(row.chkBts)}</td>
+                    <td class="px-3 py-2.5 text-center">${renderPassFailBadge(row.chkTransmisi)}</td>
+                    <td class="px-3 py-2.5 text-center">${renderPassFailBadge(row.chkCctv)}</td>
+                    <td class="px-3 py-2.5 text-center border-r border-slate-200">${renderPassFailBadge(row.chkHse)}</td>
+
+                    <td class="px-3 py-2.5 text-center">
+                        ${row.linkCrosscheck ? `<a href="${row.linkCrosscheck}" target="_blank" class="inline-flex items-center text-brand-600 hover:text-brand-800 font-semibold underline"><i data-lucide="external-link" class="w-3.5 h-3.5 mr-1"></i> Drive</a>` : '<span class="text-slate-400">-</span>'}
+                    </td>
+                    <td class="px-4 py-2.5 text-slate-600 border-r border-slate-200 truncate max-w-xs" title="${row.notedFinal || ''}">${row.notedFinal || '-'}</td>
+
+                    <td class="px-3 py-2.5 text-center">
+                        <div class="flex items-center justify-center space-x-1">
+                            <button onclick="editRecord(${originalIndex})" class="p-1 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded transition-all" title="Edit Site">
+                                <i data-lucide="edit" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteRecord(${originalIndex})" class="p-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded transition-all" title="Hapus Site">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById("recordCount").innerText = filteredData.length;
+            document.getElementById("totalRecordCount").innerText = maintenanceData.length;
+            lucide.createIcons();
+        }
+
+        // Apply Filters Logic
+        function applyFilters() {
+            const query = document.getElementById("searchInput").value.toLowerCase().trim();
+            const selectedPeriode = document.getElementById("filterPeriodePM").value;
+            const selectedCluster = document.getElementById("filterCluster").value;
+            const selectedProgress = document.getElementById("filterProgress").value;
+            const selectedDoc = document.getElementById("filterDoc").value;
+
+            filteredData = maintenanceData.filter(item => {
+                const matchesQuery = !query || 
+                    (item.siteId && item.siteId.toLowerCase().includes(query)) ||
+                    (item.siteName && item.siteName.toLowerCase().includes(query)) ||
+                    (item.teknisi && item.teknisi.toLowerCase().includes(query));
+
+                const matchesPeriode = !selectedPeriode || item.periodePM === selectedPeriode;
+                const matchesCluster = !selectedCluster || item.cluster === selectedCluster;
+                const matchesProgress = !selectedProgress || item.statusProgress === selectedProgress;
+                const matchesDoc = !selectedDoc || item.docControl === selectedDoc;
+
+                return matchesQuery && matchesPeriode && matchesCluster && matchesProgress && matchesDoc;
+            });
+
+            renderTable();
+        }
+
+        function resetFilters() {
+            document.getElementById("searchInput").value = "";
+            document.getElementById("filterPeriodePM").value = "";
+            document.getElementById("filterCluster").value = "";
+            document.getElementById("filterProgress").value = "";
+            document.getElementById("filterDoc").value = "";
+            filteredData = [...maintenanceData];
+            renderTable();
+        }
+
+        // Add/Edit Record Save Handler
+        function saveRecord(e) {
+            e.preventDefault();
+            const editIndex = parseInt(document.getElementById("editIndex").value);
+
+            const datePlanAwalVal = document.getElementById("formDatePlanAwal").value || "-";
+            const dateReplanVal = document.getElementById("formDateReplan").value || "-";
+            const planActualVal = document.getElementById("formPlanActual").value || "-";
+            const tglVisitVal = document.getElementById("formTglVisit").value || "-";
+
+            const computedActStatus = computeStatusPlanAct(datePlanAwalVal, dateReplanVal, planActualVal, tglVisitVal);
+
+            const record = {
+                siteId: document.getElementById("formSiteId").value.trim(),
+                siteName: document.getElementById("formSiteName").value.trim(),
+                periodePM: document.getElementById("formPeriodePM").value,
+                cluster: document.getElementById("formCluster").value,
+                jenisBaterai: document.getElementById("formJenisBaterai").value.trim() || "-",
+                tower: document.getElementById("formTower").value,
+                power: document.getElementById("formPower").value,
+                bts: document.getElementById("formBts").value,
+                transmisi: document.getElementById("formTransmisi").value,
+                cctv: document.getElementById("formCctv").value,
+                hse: "Approve KMT",
+                datePlanAwal: datePlanAwalVal,
+                wdPlan: datePlanAwalVal !== '-' ? "W1-Plan" : "-",
+                statusPlan: document.getElementById("formStatusPlan").value,
+                dateReplan: dateReplanVal,
+                planActual: planActualVal,
+                statusPlanAct: computedActStatus,
+                week: "W1",
+                tglVisit: tglVisitVal,
+                wdVisit: tglVisitVal !== '-' ? "W1-Visit" : "-",
+                teknisi: document.getElementById("formTeknisi").value.trim() || "-",
+                hp: document.getElementById("formHp").value.trim() || "-",
+                statusProgress: document.getElementById("formStatusProgress").value,
+                noted: document.getElementById("formNotedFinal").value.trim() || "-",
+                docControl: document.getElementById("formDocControl").value,
+                chkTower: document.getElementById("formChkTower").value,
+                chkPower: document.getElementById("formChkPower").value,
+                chkBts: document.getElementById("formChkBts").value,
+                chkTransmisi: document.getElementById("formChkTransmisi").value,
+                chkCctv: document.getElementById("formChkCctv").value,
+                chkHse: document.getElementById("formChkHse").value,
+                linkCrosscheck: document.getElementById("formLinkCrosscheck").value.trim(),
+                notedFinal: document.getElementById("formNotedFinal").value.trim() || "-"
+            };
+
+            if (editIndex >= 0) {
+                record.no = maintenanceData[editIndex].no;
+                maintenanceData[editIndex] = record;
+                showToast("Data Site Maintenance berhasil diperbarui!");
+            } else {
+                record.no = maintenanceData.length + 1;
+                maintenanceData.unshift(record);
+                showToast("Data Site Maintenance baru berhasil ditambahkan!");
+            }
+
+            saveDataToStorage();
+            closeModal();
+            applyFilters();
+            updateKPIs();
+        }
+
+        // Edit Record Loader
+        function editRecord(index) {
+            const item = maintenanceData[index];
+            if (!item) return;
+
+            document.getElementById("editIndex").value = index;
+            document.getElementById("modalTitle").innerText = `Edit Data Site ${item.siteId} (${item.periodePM || 'PM1'})`;
+
+            document.getElementById("formPeriodePM").value = item.periodePM || "PM1";
+            document.getElementById("formSiteId").value = item.siteId || "";
+            document.getElementById("formSiteName").value = item.siteName || "";
+            document.getElementById("formCluster").value = item.cluster || "Bandung Raya";
+            document.getElementById("formJenisBaterai").value = item.jenisBaterai || "";
+            document.getElementById("formTower").value = item.tower || "Approve KMT";
+            document.getElementById("formPower").value = item.power || "Approve KMT";
+            document.getElementById("formBts").value = item.bts || "Approve KMT";
+            document.getElementById("formTransmisi").value = item.transmisi || "Approve KMT";
+            document.getElementById("formCctv").value = item.cctv || "Approve KMT";
+            
+            document.getElementById("formDatePlanAwal").value = item.datePlanAwal !== '-' ? item.datePlanAwal : '';
+            document.getElementById("formStatusPlan").value = item.statusPlan || "SCHEDULED";
+            document.getElementById("formDateReplan").value = item.dateReplan !== '-' ? item.dateReplan : '';
+            document.getElementById("formPlanActual").value = item.planActual !== '-' ? item.planActual : '';
+            
+            document.getElementById("formTglVisit").value = item.tglVisit !== '-' ? item.tglVisit : '';
+            document.getElementById("formTeknisi").value = item.teknisi !== '-' ? item.teknisi : '';
+            document.getElementById("formHp").value = item.hp !== '-' ? item.hp : '';
+            document.getElementById("formStatusProgress").value = item.statusProgress || "DONE";
+            
+            document.getElementById("formChkTower").value = item.chkTower || "PASS";
+            document.getElementById("formChkPower").value = item.chkPower || "PASS";
+            document.getElementById("formChkBts").value = item.chkBts || "PASS";
+            document.getElementById("formChkTransmisi").value = item.chkTransmisi || "PASS";
+            document.getElementById("formChkCctv").value = item.chkCctv || "PASS";
+            document.getElementById("formChkHse").value = item.chkHse || "PASS";
+            
+            document.getElementById("formDocControl").value = item.docControl || "APPROVED";
+            document.getElementById("formLinkCrosscheck").value = item.linkCrosscheck || "";
+            document.getElementById("formNotedFinal").value = item.notedFinal !== '-' ? item.notedFinal : (item.noted || '');
+
+            document.getElementById("recordModal").classList.remove("hidden");
+        }
+
+        // Delete Record
+        function deleteRecord(index) {
+            const item = maintenanceData[index];
+            if (confirm(`Apakah Anda yakin ingin menghapus site ${item.siteId} (${item.periodePM || 'PM1'}) dari daftar?`)) {
+                maintenanceData.splice(index, 1);
+                saveDataToStorage();
+                applyFilters();
+                updateKPIs();
+                showToast("Site maintenance berhasil dihapus!");
+            }
+        }
+
+        // Helper: Convert Excel Serial Date or Date Object to YYYY-MM-DD
+        function formatExcelDate(val) {
+            if (!val || val === '-' || val === 'N/A') return '-';
+            
+            // If already a JS Date Object
+            if (val instanceof Date) {
+                if (isNaN(val.getTime())) return '-';
+                return val.toISOString().split('T')[0];
+            }
+
+            // If string date like "2026-04-01" or "01/04/2026"
+            if (typeof val === 'string') {
+                const trimmed = val.trim();
+                if (trimmed.match(/^\d{4}-\d{2}-\d{2}$/)) return trimmed; // Already YYYY-MM-DD
+                
+                // If it's a numeric string like "46108"
+                if (!isNaN(trimmed) && Number(trimmed) > 30000) {
+                    val = Number(trimmed);
+                } else {
+                    return trimmed;
+                }
+            }
+
+            // If numeric Excel Serial Number (e.g., 46108 -> 2026-04-01)
+            if (typeof val === 'number' && val > 30000) {
+                // Excel epoch starts at Dec 30, 1899 due to 1900 leap year bug
+                const utcDays = val - 25569;
+                const dateObj = new Date(utcDays * 86400 * 1000);
+                if (!isNaN(dateObj.getTime())) {
+                    return dateObj.toISOString().split('T')[0];
+                }
+            }
+
+            return String(val).trim();
+        }
+
+        // Excel Helper: Download Template Excel (.xlsx)
+        function downloadTemplateExcel() {
+            const headers = [
+                "Site ID", "Site Name", "Periode PM", "Cluster", "Jenis Baterai",
+                "TOWER", "POWER", "BTS", "TRANSMISI", "CCTV", "HSE",
+                "Date Plan Awal", "W_D Plan", "Status Plan", "Date Replan", "Plan Actual", "Status Plan Act", "Week",
+                "Tgl Visit", "W_D Visit", "Teknisi", "HP", "Status Progress", "Noted", "Document Control",
+                "TOWER (Chk)", "POWER (Chk)", "BTS (Chk)", "TRANSMISI (Chk)", "CCTV (Chk)", "HSE (Chk)",
+                "Link Crosscheck", "Noted (Final)"
+            ];
+
+            const sampleRow = [
+                "BDG-999", "Ciumbulewit Tower", "PM1", "Bandung Raya", "Lithium 100Ah",
+                "Approve KMT", "Approve KMT", "Approve TA", "Rejected KMT", "Uncomplete", "Approve KMT",
+                "2026-04-01", "W1-Senin", "SCHEDULED", "-", "2026-04-01", "On Schedule", "W1",
+                "2026-04-01", "W1-Senin", "Rian Hidayat", "081234567890", "DONE", "Maintenance rutin", "APPROVED",
+                "PASS", "PASS", "PASS", "PASS", "PASS", "PASS",
+                "https://drive.google.com/...", "Dokumen lengkap"
+            ];
+
+            const wsData = [headers, sampleRow];
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Template PM");
+            
+            XLSX.writeFile(wb, "Template_Bulk_Upload_PM.xlsx");
+        }
+
+        // Process Excel Upload Logic (Upsert: Site ID + Periode PM) using SheetJS
+        function processExcelUpload() {
+            const fileInput = document.getElementById("excelFileInput");
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert("Silakan pilih file Excel (.xlsx / .xls) terlebih dahulu.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                // Enable cellDates & raw formatting parsing for Excel
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Convert worksheet to JSON rows with raw values so serial numbers or dates are handled properly
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true });
+                
+                if (rows.length <= 1) {
+                    alert("File Excel kosong atau tidak memiliki baris data.");
+                    return;
+                }
+
+                let insertedCount = 0;
+                let updatedCount = 0;
+
+                // Loop baris data Excel (mulai baris index 1 untuk melompati header)
+                for (let i = 1; i < rows.length; i++) {
+                    const col = rows[i];
+                    if (!col || col.length === 0 || !col[0]) continue; // Abaikan jika Site ID kosong
+
+                    const siteId = String(col[0]).trim();
+                    const siteName = col[1] ? String(col[1]).trim() : "-";
+                    const periodePM = col[2] ? String(col[2]).trim() : "PM1";
+
+                    const datePlanAwalParsed = formatExcelDate(col[11]);
+                    const dateReplanParsed = formatExcelDate(col[14]);
+                    const planActualParsed = formatExcelDate(col[15]);
+                    const tglVisitParsed = formatExcelDate(col[18]);
+
+                    let statusPlanActVal = col[16] ? String(col[16]).trim() : "";
+                    if (!statusPlanActVal || statusPlanActVal === "-" || statusPlanActVal === "Updated") {
+                        statusPlanActVal = computeStatusPlanAct(datePlanAwalParsed, dateReplanParsed, planActualParsed, tglVisitParsed);
+                    }
+
+                    const recordData = {
+                        siteId: siteId,
+                        siteName: siteName,
+                        periodePM: periodePM,
+                        cluster: col[3] ? String(col[3]).trim() : "Bandung Raya",
+                        jenisBaterai: col[4] ? String(col[4]).trim() : "-",
+                        tower: col[5] ? String(col[5]).trim() : "Approve KMT",
+                        power: col[6] ? String(col[6]).trim() : "Approve KMT",
+                        bts: col[7] ? String(col[7]).trim() : "Approve KMT",
+                        transmisi: col[8] ? String(col[8]).trim() : "Approve KMT",
+                        cctv: col[9] ? String(col[9]).trim() : "Approve KMT",
+                        hse: col[10] ? String(col[10]).trim() : "Approve KMT",
+                        datePlanAwal: datePlanAwalParsed,
+                        wdPlan: col[12] ? String(col[12]).trim() : "-",
+                        statusPlan: col[13] ? String(col[13]).trim() : "SCHEDULED",
+                        dateReplan: dateReplanParsed,
+                        planActual: planActualParsed,
+                        statusPlanAct: statusPlanActVal,
+                        week: col[17] ? String(col[17]).trim() : "W1",
+                        tglVisit: tglVisitParsed,
+                        wdVisit: col[19] ? String(col[19]).trim() : "-",
+                        teknisi: col[20] ? String(col[20]).trim() : "-",
+                        hp: col[21] ? String(col[21]).trim() : "-",
+                        statusProgress: col[22] ? String(col[22]).trim() : "PENDING",
+                        noted: col[23] ? String(col[23]).trim() : "-",
+                        docControl: col[24] ? String(col[24]).trim() : "NOT YET",
+                        chkTower: col[25] ? String(col[25]).trim() : "PASS",
+                        chkPower: col[26] ? String(col[26]).trim() : "PASS",
+                        chkBts: col[27] ? String(col[27]).trim() : "PASS",
+                        chkTransmisi: col[28] ? String(col[28]).trim() : "PASS",
+                        chkCctv: col[29] ? String(col[29]).trim() : "PASS",
+                        chkHse: col[30] ? String(col[30]).trim() : "PASS",
+                        linkCrosscheck: col[31] ? String(col[31]).trim() : "",
+                        notedFinal: col[32] ? String(col[32]).trim() : "-"
+                    };
+
+                    // Upsert Logic: Cari kombinasi Site ID + Periode PM yang sama
+                    const existingIndex = maintenanceData.findIndex(item => 
+                        String(item.siteId).toLowerCase() === siteId.toLowerCase() && 
+                        String(item.periodePM) === periodePM
+                    );
+
+                    if (existingIndex >= 0) {
+                        recordData.no = maintenanceData[existingIndex].no;
+                        maintenanceData[existingIndex] = recordData;
+                        updatedCount++;
+                    } else {
+                        recordData.no = maintenanceData.length + 1;
+                        maintenanceData.push(recordData);
+                        insertedCount++;
+                    }
+                }
+
+                saveDataToStorage();
+                closeImportModal();
+                applyFilters();
+                updateKPIs();
+                showToast(`Bulk Excel Upload Berhasil! ${updatedCount} Diupdate, ${insertedCount} Ditambahkan.`);
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Export Filtered Data to Excel (.xlsx)
+        function exportToExcel() {
+            if (filteredData.length === 0) {
+                alert("Tidak ada data untuk di-export.");
+                return;
+            }
+
+            const headers = [
+                "No", "Site ID", "Site Name", "Periode PM", "Cluster", "Jenis Baterai",
+                "TOWER", "POWER", "BTS", "TRANSMISI", "CCTV", "HSE",
+                "Date Plan Awal", "W_D Plan", "Status Plan", "Date Replan", "Plan Actual", "Status Plan Act", "Week",
+                "Tgl Visit", "W_D Visit", "Teknisi", "HP", "Status Progress", "Noted", "Document Control",
+                "TOWER (Chk)", "POWER (Chk)", "BTS (Chk)", "TRANSMISI (Chk)", "CCTV (Chk)", "HSE (Chk)",
+                "Link Crosscheck", "Noted Final"
+            ];
+
+            const rows = filteredData.map((item, index) => [
+                index + 1,
+                item.siteId || '',
+                item.siteName || '',
+                item.periodePM || 'PM1',
+                item.cluster || '',
+                item.jenisBaterai || '',
+                item.tower || '',
+                item.power || '',
+                item.bts || '',
+                item.transmisi || '',
+                item.cctv || '',
+                item.hse || '',
+                item.datePlanAwal || '',
+                item.wdPlan || '',
+                item.statusPlan || '',
+                item.dateReplan || '',
+                item.planActual || '',
+                item.statusPlanAct || '',
+                item.week || '',
+                item.tglVisit || '',
+                item.wdVisit || '',
+                item.teknisi || '',
+                item.hp || '',
+                item.statusProgress || '',
+                item.noted || '',
+                item.docControl || '',
+                item.chkTower || '',
+                item.chkPower || '',
+                item.chkBts || '',
+                item.chkTransmisi || '',
+                item.chkCctv || '',
+                item.chkHse || '',
+                item.linkCrosscheck || '',
+                item.notedFinal || ''
+            ]);
+
+            const wsData = [headers, ...rows];
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Data Maintenance");
+
+            XLSX.writeFile(wb, `PM_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        // Show Custom Toast Notification
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            const msgSpan = document.getElementById("toastMessage");
+            msgSpan.innerText = message;
+            toast.classList.remove("translate-y-20", "opacity-0");
+            
+            setTimeout(() => {
+                toast.classList.add("translate-y-20", "opacity-0");
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

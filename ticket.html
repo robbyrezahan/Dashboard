@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard PM TICKET</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Excel / CSV Parsing & Exporting -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            800: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .sticky-col-left {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+        }
+        .sticky-col-right {
+            position: sticky;
+            right: 0;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen font-sans transition-colors duration-200">
+
+    <!-- Header Navigation -->
+    <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo & Title -->
+                <div class="flex items-center space-x-3">
+                    <div class="bg-brand-600 text-white p-2.5 rounded-xl shadow-md">
+                        <i class="fa-solid fa-list-check text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight">Dashboard PM TICKET</h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Preventive Maintenance Ticket Management System</p>
+                    </div>
+                </div>
+
+                <!-- Right Actions -->
+                <div class="flex items-center space-x-3">
+                    <!-- Bulk Upload Button -->
+                    <button onclick="openModal('uploadModal')" class="inline-flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span class="hidden md:inline">Bulk Upload</span>
+                    </button>
+
+                    <!-- Add New Record -->
+                    <button onclick="openModal('recordModal')" class="inline-flex items-center gap-2 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition">
+                        <i class="fa-solid fa-plus"></i>
+                        <span class="hidden md:inline">Tambah Data</span>
+                    </button>
+
+                    <!-- Export Menu Dropdown -->
+                    <div class="relative inline-block text-left">
+                        <button onclick="toggleDropdown('exportDropdown')" class="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition">
+                            <i class="fa-solid fa-download"></i>
+                            <span class="hidden sm:inline">Export</span>
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </button>
+                        <div id="exportDropdown" class="hidden absolute right-0 mt-2 w-48 rounded-xl bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50">
+                            <a href="#" onclick="exportData('xlsx')" class="flex items-center px-4 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i class="fa-solid fa-file-excel text-emerald-600 w-5"></i> Excel Format (.xlsx)
+                            </a>
+                            <a href="#" onclick="exportData('csv')" class="flex items-center px-4 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i class="fa-solid fa-file-csv text-blue-600 w-5"></i> CSV Format (.csv)
+                            </a>
+                            <hr class="border-slate-200 dark:border-slate-700 my-1">
+                            <a href="#" onclick="downloadTemplate()" class="flex items-center px-4 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                <i class="fa-solid fa-circle-arrow-down text-brand-500 w-5"></i> Download Template
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Reset Data -->
+                    <button onclick="resetToDefaultData()" title="Reset Data Demo" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Toast Notification Banner -->
+        <div id="toastNotification" class="hidden fixed bottom-5 right-5 z-50 flex items-center p-4 mb-4 text-slate-800 bg-white dark:bg-slate-800 dark:text-slate-200 rounded-xl shadow-2xl border-l-4 border-brand-500 space-x-3 transition-all duration-300">
+            <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-500 text-lg"></i>
+            <div id="toastMessage" class="text-sm font-medium">Operasi berhasil dilakukan!</div>
+            <button onclick="hideToast()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Metric Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <!-- Total Ticket -->
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-brand-50 dark:bg-slate-700 text-brand-600 dark:text-brand-400 rounded-xl">
+                    <i class="fa-solid fa-list-check text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Total Tiket</p>
+                    <h3 id="statTotal" class="text-xl font-bold text-slate-900 dark:text-white">0</h3>
+                </div>
+            </div>
+
+            <!-- Open Status -->
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-amber-50 dark:bg-slate-700 text-amber-600 dark:text-amber-400 rounded-xl">
+                    <i class="fa-solid fa-folder-open text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Status Open</p>
+                    <h3 id="statOpen" class="text-xl font-bold text-amber-600 dark:text-amber-400">0</h3>
+                </div>
+            </div>
+
+            <!-- In Progress -->
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-blue-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 rounded-xl">
+                    <i class="fa-solid fa-spinner text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">In Progress</p>
+                    <h3 id="statProgress" class="text-xl font-bold text-blue-600 dark:text-blue-400">0</h3>
+                </div>
+            </div>
+
+            <!-- Closed -->
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-emerald-50 dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                    <i class="fa-solid fa-circle-check text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Closed</p>
+                    <h3 id="statClosed" class="text-xl font-bold text-emerald-600 dark:text-emerald-400">0</h3>
+                </div>
+            </div>
+
+            <!-- Ticket Aging Alert -->
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center space-x-4 col-span-2 md:col-span-1">
+                <div class="p-3 bg-rose-50 dark:bg-slate-700 text-rose-600 dark:text-rose-400 rounded-xl">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Aging (>7 Hari)</p>
+                    <h3 id="statAging" class="text-xl font-bold text-rose-600 dark:text-rose-400">0</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters & Global Search Bar -->
+        <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+            <div class="flex flex-col md:flex-row gap-3 items-center justify-between">
+                <!-- Search Input -->
+                <div class="relative w-full md:w-80">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+                    <input type="text" id="searchInput" oninput="renderTable()" placeholder="Cari Tiket ID, Site Name, Teknisi..." class="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none transition">
+                </div>
+
+                <!-- Dropdown Filters -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full md:w-auto">
+                    <select id="filterStatusTiket" onchange="renderTable()" class="px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="">Semua Status Tiket</option>
+                    </select>
+
+                    <select id="filterCluster" onchange="renderTable()" class="px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="">Semua Cluster</option>
+                    </select>
+
+                    <select id="filterScope" onchange="renderTable()" class="px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="">Semua Scope</option>
+                    </select>
+
+                    <select id="filterStatusVisit" onchange="renderTable()" class="px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="">Semua Status Visit</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Table Wrapper (24 Columns Display) -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto max-h-[600px] relative">
+                <table class="w-full text-xs text-left text-slate-600 dark:text-slate-300 border-collapse">
+                    <thead class="text-xs uppercase bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 sticky top-0 z-20 backdrop-blur">
+                        <tr class="divide-x divide-slate-200 dark:divide-slate-700">
+                            <th class="px-3 py-3 font-semibold text-center sticky-col-left bg-slate-100 dark:bg-slate-700 min-w-[50px]">NO</th>
+                            <th class="px-3 py-3 font-semibold min-w-[120px]">Tiket ID</th>
+                            <th class="px-3 py-3 font-semibold min-w-[110px]">Site ID</th>
+                            <th class="px-3 py-3 font-semibold min-w-[160px]">Site Name</th>
+                            <th class="px-3 py-3 font-semibold min-w-[110px]">Cluster</th>
+                            <th class="px-3 py-3 font-semibold min-w-[120px]">Scope</th>
+                            <th class="px-3 py-3 font-semibold min-w-[120px]">Status Tiket</th>
+                            <th class="px-3 py-3 font-semibold min-w-[120px]">Type Battery</th>
+                            <th class="px-3 py-3 font-semibold min-w-[110px]">Date Start</th>
+                            <th class="px-3 py-3 font-semibold min-w-[100px]">MOUNT</th>
+                            <th class="px-3 py-3 font-semibold min-w-[100px]">Week Open</th>
+                            <th class="px-3 py-3 font-semibold min-w-[100px]">Tiket Aging</th>
+                            <th class="px-3 py-3 font-semibold min-w-[120px]">Actual Online</th>
+                            <th class="px-3 py-3 font-semibold min-w-[100px]">Week Close</th>
+                            <th class="px-3 py-3 font-semibold min-w-[150px]">Sumber Masalah</th>
+                            <th class="px-3 py-3 font-semibold min-w-[130px]">Teknisi</th>
+                            <th class="px-3 py-3 font-semibold min-w-[110px]">Hp</th>
+                            <th class="px-3 py-3 font-semibold min-w-[110px]">Tgl Visit</th>
+                            <th class="px-3 py-3 font-semibold min-w-[120px]">Status Visit</th>
+                            <th class="px-3 py-3 font-semibold min-w-[150px]">Action</th>
+                            <th class="px-3 py-3 font-semibold min-w-[150px]">Noted</th>
+                            <th class="px-3 py-3 font-semibold min-w-[130px]">Document Control</th>
+                            <th class="px-3 py-3 font-semibold min-w-[140px]">Link Dokumentasi</th>
+                            <th class="px-3 py-3 font-semibold min-w-[150px]">Keterangan</th>
+                            <th class="px-3 py-3 font-semibold text-center sticky-col-right bg-slate-100 dark:bg-slate-700 min-w-[110px]">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-200 dark:divide-slate-700">
+                        <!-- Dynamic Rows loaded via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer Info -->
+            <div class="px-4 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-2">
+                <div>
+                    Menampilkan <span id="recordCount" class="font-bold text-slate-800 dark:text-slate-200">0</span> entri data
+                </div>
+                <div class="text-slate-400">
+                    <i class="fa-solid fa-database mr-1"></i> Permanent Storage Key: <span class="font-mono text-slate-600 dark:text-slate-300 font-semibold">pm_ticket_db_v2</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Add / Edit Single Record -->
+    <div id="recordModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-700 my-8 overflow-hidden transform transition-all">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 id="modalTitle" class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-brand-600"></i> Form Data PM Ticket
+                </h3>
+                <button onclick="closeModal('recordModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form Body -->
+            <form id="recordForm" onsubmit="saveRecord(event)" class="p-6">
+                <input type="hidden" id="editIndex" value="-1">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-h-[65vh] overflow-y-auto pr-2">
+                    <!-- Row 1 -->
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Tiket ID *</label>
+                        <input type="text" id="inputTiketID" required class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Site ID *</label>
+                        <input type="text" id="inputSiteID" required class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Site Name *</label>
+                        <input type="text" id="inputSiteName" required class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+
+                    <!-- Row 2 -->
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Cluster</label>
+                        <input type="text" id="inputCluster" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Scope</label>
+                        <select id="inputScope" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                            <option value="TOWER">TOWER</option>
+                            <option value="POWER">POWER</option>
+                            <option value="BTS">BTS</option>
+                            <option value="TRANSMISI">TRANSMISI</option>
+                            <option value="CCTV">CCTV</option>
+                            <option value="HSE">HSE</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Status Tiket</label>
+                        <select id="inputStatusTiket" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                            <option value="Open">Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Closed">Closed</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+
+                    <!-- Row 3 -->
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Type Battery</label>
+                        <input type="text" id="inputTypeBattery" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Date Start</label>
+                        <input type="date" id="inputDateStart" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">MOUNT</label>
+                        <input type="text" id="inputMOUNT" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+
+                    <!-- Row 4 -->
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Week Open</label>
+                        <input type="text" id="inputWeekOpen" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Tiket Aging (Hari)</label>
+                        <input type="number" id="inputTiketAging" min="0" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Actual Online</label>
+                        <input type="date" id="inputActualOnline" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+
+                    <!-- Row 5 -->
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Week Close</label>
+                        <input type="text" id="inputWeekClose" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Sumber Masalah</label>
+                        <input type="text" id="inputSumberMasalah" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Teknisi</label>
+                        <input type="text" id="inputTeknisi" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+
+                    <!-- Row 6 -->
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Hp</label>
+                        <input type="text" id="inputHp" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Tgl Visit</label>
+                        <input type="date" id="inputTglVisit" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Status Visit</label>
+                        <select id="inputStatusVisit" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                            <option value="Done">Done</option>
+                            <option value="Scheduled">Scheduled</option>
+                            <option value="Cancel">Cancel</option>
+                            <option value="Pending">Pending</option>
+                        </select>
+                    </div>
+
+                    <!-- Row 7 -->
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Action</label>
+                        <input type="text" id="inputAction" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Noted</label>
+                        <input type="text" id="inputNoted" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Document Control</label>
+                        <input type="text" id="inputDocumentControl" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+
+                    <!-- Row 8 -->
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold mb-1">Link Dokumentasi (URL)</label>
+                        <input type="url" id="inputLinkDokumentasi" placeholder="https://..." class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">Keterangan</label>
+                        <input type="text" id="inputKeterangan" class="w-full p-2 text-xs bg-slate-50 dark:bg-slate-900 border rounded-lg dark:border-slate-700">
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="mt-6 border-t border-slate-200 dark:border-slate-700 pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal('recordModal')" class="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 rounded-lg">
+                        Batal
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-md">
+                        Simpan Data
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: View Record Detail -->
+    <div id="detailModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden transform transition-all">
+            <div class="px-6 py-4 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info text-brand-600"></i> Detail PM Ticket
+                </h3>
+                <button onclick="closeModal('detailModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="detailContent" class="p-6 max-h-[70vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <!-- Content generated via JS -->
+            </div>
+            <div class="px-6 py-3 bg-slate-50 dark:bg-slate-700/50 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+                <button onclick="closeModal('detailModal')" class="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 dark:bg-slate-600 dark:text-slate-200 rounded-lg">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Bulk Upload -->
+    <div id="uploadModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div class="px-6 py-4 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up text-emerald-600"></i> Bulk Upload (Upsert Mode)
+                </h3>
+                <button onclick="closeModal('uploadModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-6 text-center bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer" onclick="document.getElementById('fileInput').click()">
+                    <i class="fa-solid fa-file-excel text-4xl text-emerald-500 mb-2"></i>
+                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">Pilih berkas Excel (.xlsx) atau CSV (.csv)</p>
+                    <p class="text-xs text-slate-400 mt-1">Sistem akan secara otomatis <strong>UPDATE</strong> jika Tiket ID sudah ada, dan <strong>INSERT</strong> jika Tiket ID baru.</p>
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
+                </div>
+
+                <div class="flex items-center justify-between text-xs bg-amber-50 dark:bg-slate-700/40 p-3 rounded-lg border border-amber-200 dark:border-slate-600">
+                    <div class="flex items-center space-x-2 text-amber-800 dark:text-amber-200">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span>Belum punya format Excel?</span>
+                    </div>
+                    <button onclick="downloadTemplate()" class="font-bold text-brand-600 dark:text-brand-400 hover:underline">
+                        Download Template
+                    </button>
+                </div>
+            </div>
+
+            <div class="px-6 py-3 bg-slate-50 dark:bg-slate-700/50 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+                <button onclick="closeModal('uploadModal')" class="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 dark:bg-slate-600 dark:text-slate-200 rounded-lg">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        // 24 Standard Column Names
+        const COLUMN_KEYS = [
+            "NO", "Tiket ID", "Site ID", "Site Name", "Cluster", "Scope", 
+            "Status Tiket", "Type Battery", "Date Start", "MOUNT", "Week Open", 
+            "Tiket Aging", "Actual Online", "Week Close", "Sumber Masalah", "Teknisi", 
+            "Hp", "Tgl Visit", "Status Visit", "Action", "Noted", 
+            "Document Control", "Link Dokumentasi", "Keterangan"
+        ];
+
+        // Scope options definition
+        const SCOPE_OPTIONS = ["TOWER", "POWER", "BTS", "TRANSMISI", "CCTV", "HSE"];
+
+        // Key untuk LocalStorage V3
+        const STORAGE_KEY = 'pm_ticket_db_v3';
+
+        // Sample initial data if LocalStorage key is completely absent
+        const DEFAULT_INITIAL_DATA = [
+            {
+                "NO": 1,
+                "Tiket ID": "PM-2026-001",
+                "Site ID": "JKT-012",
+                "Site Name": "Monas Micro",
+                "Cluster": "Jakarta Pusat",
+                "Scope": "POWER",
+                "Status Tiket": "Open",
+                "Type Battery": "Lithium 100Ah",
+                "Date Start": "2026-10-25",
+                "MOUNT": "October",
+                "Week Open": "W4",
+                "Tiket Aging": 8,
+                "Actual Online": "",
+                "Week Close": "",
+                "Sumber Masalah": "Battery Degraded",
+                "Teknisi": "Budi Santoso",
+                "Hp": "081234567890",
+                "Tgl Visit": "2026-10-26",
+                "Status Visit": "Visited",
+                "Action": "Check & Replace Cell",
+                "Noted": "Menunggu unit cadangan",
+                "Document Control": "DC-JKT-01",
+                "Link Dokumentasi": "https://drive.google.com",
+                "Keterangan": "Prioritas Tinggi"
+            },
+            {
+                "NO": 2,
+                "Tiket ID": "PM-2026-002",
+                "Site ID": "BDG-045",
+                "Site Name": "Dago Hill",
+                "Cluster": "Bandung Utara",
+                "Scope": "TOWER",
+                "Status Tiket": "In Progress",
+                "Type Battery": "VRLA 150Ah",
+                "Date Start": "2026-10-28",
+                "MOUNT": "October",
+                "Week Open": "W4",
+                "Tiket Aging": 5,
+                "Actual Online": "",
+                "Week Close": "",
+                "Sumber Masalah": "Power Surge",
+                "Teknisi": "Ahmad Dani",
+                "Hp": "081987654321",
+                "Tgl Visit": "2026-10-29",
+                "Status Visit": "Visited",
+                "Action": "Reset Module Rectifier",
+                "Noted": "Monitoring 24 jam",
+                "Document Control": "DC-BDG-08",
+                "Link Dokumentasi": "https://drive.google.com",
+                "Keterangan": "Normal"
+            },
+            {
+                "NO": 3,
+                "Tiket ID": "PM-2026-003",
+                "Site ID": "SUB-089",
+                "Site Name": "Tunjungan Macro",
+                "Cluster": "Surabaya Pusat",
+                "Scope": "BTS",
+                "Status Tiket": "Closed",
+                "Type Battery": "Lithium 50Ah",
+                "Date Start": "2026-10-15",
+                "MOUNT": "October",
+                "Week Open": "W3",
+                "Tiket Aging": 2,
+                "Actual Online": "2026-10-17",
+                "Week Close": "W3",
+                "Sumber Masalah": "Routine Check",
+                "Teknisi": "Eko Prasetyo",
+                "Hp": "081311223344",
+                "Tgl Visit": "2026-10-16",
+                "Status Visit": "Visited",
+                "Action": "Clean AirFilter & Test Load",
+                "Noted": "Selesai tanpa kendala",
+                "Document Control": "DC-SUB-12",
+                "Link Dokumentasi": "https://drive.google.com",
+                "Keterangan": "Closed Smooth"
+            }
+        ];
+
+        // Main State Database Variable
+        let siteDatabase = [];
+
+        // Application Startup Handler
+        window.addEventListener('DOMContentLoaded', () => {
+            loadFromLocalStorage();
+            renderTable();
+        });
+
+        function loadFromLocalStorage() {
+            const rawStorageData = localStorage.getItem(STORAGE_KEY);
+            
+            if (rawStorageData !== null) {
+                try {
+                    siteDatabase = JSON.parse(rawStorageData);
+                } catch (e) {
+                    console.error("Gagal membaca LocalStorage:", e);
+                    siteDatabase = [...DEFAULT_INITIAL_DATA];
+                    saveToLocalStorage();
+                }
+            } else {
+                siteDatabase = [...DEFAULT_INITIAL_DATA];
+                saveToLocalStorage();
+            }
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(siteDatabase));
+        }
+
+        // Helper function to dynamically populate dropdown options
+        function populateSelectOptions(selectId, keyName) {
+            const select = document.getElementById(selectId);
+            if (!select) return;
+            const currentVal = select.value;
+            const uniqueValues = [...new Set(siteDatabase.map(item => item[keyName]).filter(Boolean))].sort();
+
+            select.innerHTML = `<option value="">Semua ${keyName}</option>`;
+            uniqueValues.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = val;
+                if (val === currentVal) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        // Update Summary Dashboard Metric Cards
+        function updateDashboardMetrics(data) {
+            document.getElementById('statTotal').innerText = data.length;
+            document.getElementById('statOpen').innerText = data.filter(d => (d['Status Tiket'] || '').toLowerCase() === 'open').length;
+            document.getElementById('statProgress').innerText = data.filter(d => (d['Status Tiket'] || '').toLowerCase() === 'in progress').length;
+            document.getElementById('statClosed').innerText = data.filter(d => (d['Status Tiket'] || '').toLowerCase() === 'closed').length;
+            document.getElementById('statAging').innerText = data.filter(d => parseInt(d['Tiket Aging'] || 0) > 7).length;
+            document.getElementById('recordCount').innerText = data.length;
+        }
+
+        // Dynamic Filter Dropdowns
+        function populateDropdownFilters() {
+            populateSelectOptions('filterStatusTiket', 'Status Tiket');
+            populateScopeFilterOptions();
+            populateSelectOptions('filterCluster', 'Cluster');
+            populateSelectOptions('filterStatusVisit', 'Status Visit');
+        }
+
+        function populateScopeFilterOptions() {
+            const select = document.getElementById('filterScope');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">Semua Scope</option>';
+            SCOPE_OPTIONS.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = val;
+                if (val === currentVal) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        // Main Table Rendering Engine
+        function renderTable() {
+            populateDropdownFilters();
+
+            const searchKey = document.getElementById('searchInput').value.toLowerCase().trim();
+            const filterStatusTiket = document.getElementById('filterStatusTiket').value;
+            const filterCluster = document.getElementById('filterCluster').value;
+            const filterScope = document.getElementById('filterScope').value;
+            const filterStatusVisit = document.getElementById('filterStatusVisit').value;
+
+            // Filter data
+            const filteredData = siteDatabase.filter(row => {
+                const matchesSearch = Object.values(row).some(val => 
+                    String(val || '').toLowerCase().includes(searchKey)
+                );
+
+                const matchesStatusTiket = !filterStatusTiket || row['Status Tiket'] === filterStatusTiket;
+                const matchesCluster = !filterCluster || row['Cluster'] === filterCluster;
+                const matchesScope = !filterScope || row['Scope'] === filterScope;
+                const matchesStatusVisit = !filterStatusVisit || row['Status Visit'] === filterStatusVisit;
+
+                return matchesSearch && matchesStatusTiket && matchesCluster && matchesScope && matchesStatusVisit;
+            });
+
+            updateDashboardMetrics(filteredData);
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="25" class="px-4 py-8 text-center text-slate-400">
+                            <i class="fa-solid fa-folder-open text-3xl mb-2"></i>
+                            <p>Tidak ada data PM Ticket yang sesuai.</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            filteredData.forEach((item, index) => {
+                const originalIndex = siteDatabase.indexOf(item);
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 dark:hover:bg-slate-700/50 transition divide-x divide-slate-200 dark:divide-slate-700 border-b border-slate-200 dark:border-slate-700";
+
+                // Status Badge logic
+                let statusBadgeClass = "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+                const st = (item['Status Tiket'] || '').toLowerCase();
+                if (st === 'open') statusBadgeClass = "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300";
+                else if (st === 'in progress') statusBadgeClass = "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300";
+                else if (st === 'closed') statusBadgeClass = "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300";
+
+                // URL format check
+                let linkHtml = "-";
+                if (item['Link Dokumentasi'] && item['Link Dokumentasi'].trim() !== '') {
+                    linkHtml = `<a href="${item['Link Dokumentasi']}" target="_blank" class="text-brand-600 dark:text-brand-400 hover:underline inline-flex items-center gap-1 font-semibold">
+                                  <i class="fa-solid fa-link text-xs"></i> Link
+                                </a>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="px-3 py-2.5 text-center font-bold sticky-col-left bg-white dark:bg-slate-800">${index + 1}</td>
+                    <td class="px-3 py-2.5 font-bold text-slate-900 dark:text-white">${item['Tiket ID'] || '-'}</td>
+                    <td class="px-3 py-2.5 font-semibold text-brand-600 dark:text-brand-400">${item['Site ID'] || '-'}</td>
+                    <td class="px-3 py-2.5 font-medium">${item['Site Name'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Cluster'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Scope'] || '-'}</td>
+                    <td class="px-3 py-2.5">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${statusBadgeClass}">
+                            ${item['Status Tiket'] || 'Open'}
+                        </span>
+                    </td>
+                    <td class="px-3 py-2.5">${item['Type Battery'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Date Start'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['MOUNT'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Week Open'] || '-'}</td>
+                    <td class="px-3 py-2.5 ${parseInt(item['Tiket Aging']) > 7 ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}">
+                        ${item['Tiket Aging'] ? item['Tiket Aging'] + ' Hari' : '-'}
+                    </td>
+                    <td class="px-3 py-2.5">${item['Actual Online'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Week Close'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Sumber Masalah'] || '-'}</td>
+                    <td class="px-3 py-2.5 font-medium">${item['Teknisi'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Hp'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Tgl Visit'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Status Visit'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Action'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Noted'] || '-'}</td>
+                    <td class="px-3 py-2.5">${item['Document Control'] || '-'}</td>
+                    <td class="px-3 py-2.5">${linkHtml}</td>
+                    <td class="px-3 py-2.5">${item['Keterangan'] || '-'}</td>
+                    <td class="px-3 py-2.5 text-center sticky-col-right bg-white dark:bg-slate-800">
+                        <div class="flex items-center justify-center space-x-1">
+                            <button onclick="viewDetail(${originalIndex})" class="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition" title="Lihat Detail">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                            <button onclick="editRecord(${originalIndex})" class="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 rounded transition" title="Edit Data">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="deleteRecord(${originalIndex})" class="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-700 rounded transition" title="Hapus Data">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Single Form Save Logic (Create or Edit)
+        function saveRecord(event) {
+            event.preventDefault();
+            const editIdx = parseInt(document.getElementById('editIndex').value);
+
+            const record = {
+                "NO": editIdx >= 0 ? siteDatabase[editIdx]["NO"] : siteDatabase.length + 1,
+                "Tiket ID": document.getElementById('inputTiketID').value.trim(),
+                "Site ID": document.getElementById('inputSiteID').value.trim(),
+                "Site Name": document.getElementById('inputSiteName').value.trim(),
+                "Cluster": document.getElementById('inputCluster').value.trim(),
+                "Scope": document.getElementById('inputScope').value.trim(),
+                "Status Tiket": document.getElementById('inputStatusTiket').value,
+                "Type Battery": document.getElementById('inputTypeBattery').value.trim(),
+                "Date Start": document.getElementById('inputDateStart').value,
+                "MOUNT": document.getElementById('inputMOUNT').value.trim(),
+                "Week Open": document.getElementById('inputWeekOpen').value.trim(),
+                "Tiket Aging": document.getElementById('inputTiketAging').value,
+                "Actual Online": document.getElementById('inputActualOnline').value,
+                "Week Close": document.getElementById('inputWeekClose').value.trim(),
+                "Sumber Masalah": document.getElementById('inputSumberMasalah').value.trim(),
+                "Teknisi": document.getElementById('inputTeknisi').value.trim(),
+                "Hp": document.getElementById('inputHp').value.trim(),
+                "Tgl Visit": document.getElementById('inputTglVisit').value,
+                "Status Visit": document.getElementById('inputStatusVisit').value,
+                "Action": document.getElementById('inputAction').value.trim(),
+                "Noted": document.getElementById('inputNoted').value.trim(),
+                "Document Control": document.getElementById('inputDocumentControl').value.trim(),
+                "Link Dokumentasi": document.getElementById('inputLinkDokumentasi').value.trim(),
+                "Keterangan": document.getElementById('inputKeterangan').value.trim()
+            };
+
+            if (editIdx >= 0) {
+                siteDatabase[editIdx] = record;
+                showToast("Data tiket berhasil diperbarui!", "success");
+            } else {
+                // Check if Tiket ID already exists manually
+                const existingIdx = siteDatabase.findIndex(item => item["Tiket ID"].toLowerCase() === record["Tiket ID"].toLowerCase());
+                if (existingIdx !== -1) {
+                    siteDatabase[existingIdx] = { ...siteDatabase[existingIdx], ...record, NO: siteDatabase[existingIdx]["NO"] };
+                    showToast(`Tiket ID "${record["Tiket ID"]}" sudah ada, data diperbarui!`, "success");
+                } else {
+                    siteDatabase.push(record);
+                    showToast("Data tiket baru berhasil ditambahkan!", "success");
+                }
+            }
+
+            reindexNO();
+            saveToLocalStorage();
+            renderTable();
+            closeModal('recordModal');
+        }
+
+        function editRecord(index) {
+            const item = siteDatabase[index];
+            document.getElementById('editIndex').value = index;
+            document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square text-brand-600"></i> Edit Data PM Ticket';
+
+            document.getElementById('inputTiketID').value = item['Tiket ID'] || '';
+            document.getElementById('inputSiteID').value = item['Site ID'] || '';
+            document.getElementById('inputSiteName').value = item['Site Name'] || '';
+            document.getElementById('inputCluster').value = item['Cluster'] || '';
+            document.getElementById('inputScope').value = item['Scope'] || '';
+            document.getElementById('inputStatusTiket').value = item['Status Tiket'] || 'Open';
+            document.getElementById('inputTypeBattery').value = item['Type Battery'] || '';
+            document.getElementById('inputDateStart').value = item['Date Start'] || '';
+            document.getElementById('inputMOUNT').value = item['MOUNT'] || '';
+            document.getElementById('inputWeekOpen').value = item['Week Open'] || '';
+            document.getElementById('inputTiketAging').value = item['Tiket Aging'] || '';
+            document.getElementById('inputActualOnline').value = item['Actual Online'] || '';
+            document.getElementById('inputWeekClose').value = item['Week Close'] || '';
+            document.getElementById('inputSumberMasalah').value = item['Sumber Masalah'] || '';
+            document.getElementById('inputTeknisi').value = item['Teknisi'] || '';
+            document.getElementById('inputHp').value = item['Hp'] || '';
+            document.getElementById('inputTglVisit').value = item['Tgl Visit'] || '';
+            document.getElementById('inputStatusVisit').value = item['Status Visit'] || 'Done';
+            document.getElementById('inputAction').value = item['Action'] || '';
+            document.getElementById('inputNoted').value = item['Noted'] || '';
+            document.getElementById('inputDocumentControl').value = item['Document Control'] || '';
+            document.getElementById('inputLinkDokumentasi').value = item['Link Dokumentasi'] || '';
+            document.getElementById('inputKeterangan').value = item['Keterangan'] || '';
+
+            openModal('recordModal');
+        }
+
+        function viewDetail(index) {
+            const item = siteDatabase[index];
+            const content = document.getElementById('detailContent');
+            content.innerHTML = '';
+
+            COLUMN_KEYS.forEach(key => {
+                const div = document.createElement('div');
+                div.className = "bg-slate-50 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200 dark:border-slate-700/60";
+                
+                let val = item[key] !== undefined && item[key] !== null ? item[key] : '-';
+                if (key === 'Link Dokumentasi' && val !== '-' && val !== '') {
+                    val = `<a href="${val}" target="_blank" class="text-brand-600 dark:text-brand-400 font-semibold underline break-all">${val}</a>`;
+                }
+
+                div.innerHTML = `
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">${key}</span>
+                    <span class="font-medium text-slate-800 dark:text-slate-200">${val || '-'}</span>
+                `;
+                content.appendChild(div);
+            });
+
+            openModal('detailModal');
+        }
+
+        function deleteRecord(index) {
+            if (confirm(`Apakah Anda yakin ingin menghapus data dengan Tiket ID "${siteDatabase[index]['Tiket ID']}"?`)) {
+                siteDatabase.splice(index, 1);
+                reindexNO();
+                saveToLocalStorage();
+                renderTable();
+                showToast("Data tiket berhasil dihapus!", "success");
+            }
+        }
+
+        function reindexNO() {
+            siteDatabase.forEach((item, idx) => {
+                item['NO'] = idx + 1;
+            });
+        }
+
+        function resetToDefaultData() {
+            if (confirm("Apakah Anda yakin ingin mereset data ke versi sampel bawaan?")) {
+                siteDatabase = [...DEFAULT_INITIAL_DATA];
+                saveToLocalStorage();
+                renderTable();
+                showToast("Data berhasil direset ke sampel default!", "success");
+            }
+        }
+
+        // Bulk Upload UPSERT Logic (Fixed Feature 1 & Excel Date Formatting)
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Parse sheet to JSON array
+                    const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                    if (rawRows.length === 0) {
+                        showToast("Berkas Kosong atau format tidak sesuai!", "error");
+                        return;
+                    }
+
+                    let addedCount = 0;
+                    let updatedCount = 0;
+
+                    rawRows.forEach(row => {
+                        // Extract Tiket ID
+                        const tiketID = String(row['Tiket ID'] || row['tiket id'] || row['TIKET ID'] || row['TiketID'] || '').trim();
+                        if (!tiketID) return; // Skip invalid row without Tiket ID
+
+                        // Date parser helper for Excel dates
+                        const parseDateVal = (val) => formatExcelDate(val);
+
+                        const rowData = {
+                            "Tiket ID": tiketID,
+                            "Site ID": String(row['Site ID'] || row['site id'] || '').trim(),
+                            "Site Name": String(row['Site Name'] || row['site name'] || '').trim(),
+                            "Cluster": String(row['Cluster'] || row['cluster'] || '').trim(),
+                            "Scope": String(row['Scope'] || row['scope'] || '').trim().toUpperCase(),
+                            "Status Tiket": String(row['Status Tiket'] || row['status tiket'] || 'Open').trim(),
+                            "Type Battery": String(row['Type Battery'] || row['type battery'] || '').trim(),
+                            "Date Start": parseDateVal(row['Date Start'] || row['date start']),
+                            "MOUNT": String(row['MOUNT'] || row['mount'] || '').trim(),
+                            "Week Open": String(row['Week Open'] || row['week open'] || '').trim(),
+                            "Tiket Aging": parseInt(row['Tiket Aging'] || row['tiket aging'] || 0) || 0,
+                            "Actual Online": parseDateVal(row['Actual Online'] || row['actual online']),
+                            "Week Close": String(row['Week Close'] || row['week close'] || '').trim(),
+                            "Sumber Masalah": String(row['Sumber Masalah'] || row['sumber masalah'] || '').trim(),
+                            "Teknisi": String(row['Teknisi'] || row['teknisi'] || '').trim(),
+                            "Hp": String(row['Hp'] || row['hp'] || '').trim(),
+                            "Tgl Visit": parseDateVal(row['Tgl Visit'] || row['tgl visit']),
+                            "Status Visit": String(row['Status Visit'] || row['status visit'] || '').trim(),
+                            "Action": String(row['Action'] || row['action'] || '').trim(),
+                            "Noted": String(row['Noted'] || row['noted'] || '').trim(),
+                            "Document Control": String(row['Document Control'] || row['document control'] || '').trim(),
+                            "Link Dokumentasi": String(row['Link Dokumentasi'] || row['link dokumentasi'] || '').trim(),
+                            "Keterangan": String(row['Keterangan'] || row['keterangan'] || '').trim()
+                        };
+
+                        // UPSERT Logic: Match by Tiket ID
+                        const matchIndex = siteDatabase.findIndex(item => String(item['Tiket ID']).toLowerCase() === tiketID.toLowerCase());
+
+                        if (matchIndex !== -1) {
+                            // UPDATE existing ticket
+                            siteDatabase[matchIndex] = {
+                                ...siteDatabase[matchIndex],
+                                ...rowData,
+                                NO: siteDatabase[matchIndex]['NO'] // Retain NO
+                            };
+                            updatedCount++;
+                        } else {
+                            // INSERT new ticket
+                            rowData['NO'] = siteDatabase.length + 1;
+                            siteDatabase.push(rowData);
+                            addedCount++;
+                        }
+                    });
+
+                    reindexNO();
+                    saveToLocalStorage();
+                    renderTable();
+                    closeModal('uploadModal');
+
+                    showToast(`Bulk Upload Berhasil! (${addedCount} data baru, ${updatedCount} data diperbarui)`, "success");
+
+                } catch (err) {
+                    console.error("Error parsing file:", err);
+                    showToast("Gagal memproses berkas Excel/CSV!", "error");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            // Reset input value so same file can be selected again
+            event.target.value = '';
+        }
+
+        // Helper: Convert Excel Serial Date / Date Object to YYYY-MM-DD
+        function formatExcelDate(dateVal) {
+            if (!dateVal) return '';
+            
+            // If it's already an instance of Date
+            if (dateVal instanceof Date) {
+                if (isNaN(dateVal.getTime())) return '';
+                return dateVal.toISOString().split('T')[0];
+            }
+
+            // If it's an Excel numeric serial date (e.g. 46193)
+            if (typeof dateVal === 'number') {
+                if (window.XLSX && XLSX.SSF) {
+                    const parsed = XLSX.SSF.parse_date_code(dateVal);
+                    if (parsed) {
+                        const y = parsed.y;
+                        const m = String(parsed.m).padStart(2, '0');
+                        const d = String(parsed.d).padStart(2, '0');
+                        return `${y}-${m}-${d}`;
+                    }
+                }
+            }
+
+            // If it's a string, try standard parsing
+            const strVal = String(dateVal).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(strVal)) return strVal;
+
+            const dObj = new Date(strVal);
+            if (!isNaN(dObj.getTime())) {
+                return dObj.toISOString().split('T')[0];
+            }
+
+            return strVal;
+        }
+
+        // Export Function (Excel / CSV)
+        function exportData(type) {
+            if (siteDatabase.length === 0) {
+                showToast("Tidak ada data untuk di-export!", "error");
+                return;
+            }
+
+            const exportArr = siteDatabase.map(row => {
+                const item = {};
+                COLUMN_KEYS.forEach(k => {
+                    item[k] = row[k] !== undefined && row[k] !== null ? row[k] : '';
+                });
+                return item;
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(exportArr, { header: COLUMN_KEYS });
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "PM Ticket Database");
+
+            const filename = `PM_Ticket_Database_${new Date().toISOString().slice(0,10)}.${type}`;
+            XLSX.writeFile(workbook, filename);
+            showToast(`Data berhasil diexport ke ${filename}!`, "success");
+        }
+
+        // Template Download Engine
+        function downloadTemplate() {
+            const templateData = [
+                {
+                    "NO": 1,
+                    "Tiket ID": "PM-2026-001",
+                    "Site ID": "JKT-012",
+                    "Site Name": "Monas Micro",
+                    "Cluster": "Jakarta Pusat",
+                    "Scope": "POWER",
+                    "Status Tiket": "Open",
+                    "Type Battery": "Lithium 100Ah",
+                    "Date Start": "2026-10-25",
+                    "MOUNT": "October",
+                    "Week Open": "W4",
+                    "Tiket Aging": 8,
+                    "Actual Online": "",
+                    "Week Close": "",
+                    "Sumber Masalah": "Battery Degraded",
+                    "Teknisi": "Budi Santoso",
+                    "Hp": "081234567890",
+                    "Tgl Visit": "2026-10-26",
+                    "Status Visit": "Visited",
+                    "Action": "Check & Replace Cell",
+                    "Noted": "Menunggu unit cadangan",
+                    "Document Control": "DC-JKT-01",
+                    "Link Dokumentasi": "https://drive.google.com",
+                    "Keterangan": "Prioritas Tinggi"
+                }
+            ];
+
+            const worksheet = XLSX.utils.json_to_sheet(templateData, { header: COLUMN_KEYS });
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "PM Ticket Database");
+
+            XLSX.writeFile(workbook, "PM Ticket Template.xlsx");
+            showToast("Template PM Ticket berhasil di-download!", "success");
+        }
+
+        // UI Helpers & Modals
+        function openModal(modalId) {
+            if (modalId === 'recordModal' && document.getElementById('editIndex').value === '-1') {
+                document.getElementById('recordForm').reset();
+                document.getElementById('editIndex').value = '-1';
+                document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-plus text-brand-600"></i> Tambah Data PM Ticket';
+            }
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        function toggleDropdown(id) {
+            const el = document.getElementById(id);
+            el.classList.toggle('hidden');
+        }
+
+        // Close dropdown when clicking outside
+        window.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('exportDropdown');
+            if (dropdown && !dropdown.contains(e.target) && !e.target.closest('button[onclick*="exportDropdown"]')) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        // Toast Notification System
+        let toastTimeout;
+        function showToast(message, type = "success") {
+            const toast = document.getElementById('toastNotification');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+
+            msg.innerText = message;
+            if (type === "success") {
+                icon.className = "fa-solid fa-circle-check text-emerald-500 text-lg";
+            } else {
+                icon.className = "fa-solid fa-triangle-exclamation text-rose-500 text-lg";
+            }
+
+            toast.classList.remove('hidden');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                hideToast();
+            }, 4000);
+        }
+
+        function hideToast() {
+            document.getElementById('toastNotification').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BAKTI MSS 4G - Network & Site Operations Center</title>
+  
+  <!-- Leaflet CSS & JS (Free Map Provider - No API Key Needed) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Leaflet Marker Cluster Plugin -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body { background-color: #0b1120; color: #f8fafc; font-family: ui-sans-serif, system-ui, sans-serif; }
+    #map { height: calc(100vh - 220px); min-height: 480px; width: 100%; }
+    
+    /* Custom Styling Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    
+    /* Cluster Styling Custom */
+    .marker-cluster-small { background-color: rgba(16, 185, 129, 0.6) !important; }
+    .marker-cluster-small div { background-color: rgba(5, 150, 105, 0.85) !important; color: white !important; font-weight: bold; }
+    .marker-cluster-medium { background-color: rgba(245, 158, 11, 0.6) !important; }
+    .marker-cluster-medium div { background-color: rgba(217, 119, 6, 0.85) !important; color: white !important; font-weight: bold; }
+  </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+  <!-- Top Navbar -->
+  <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="p-2 bg-indigo-600 rounded-lg">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+      </div>
+      <div>
+        <h1 class="font-bold text-base text-white leading-tight">Network & Site Operations Center</h1>
+        <p class="text-xs text-slate-400">Sistem Monitoring Terdistribusi Indonesia</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-4 text-xs text-slate-400">
+      <span class="flex items-center gap-1.5 bg-emerald-950/60 text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-800/50">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        Status Sistem: <strong id="db-status-badge">Membaca Database...</strong>
+      </span>
+      <button onclick="loadSitesFromIndexedDB()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition" title="Refresh Data">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Sidebar & Main Content Layout -->
+  <div class="flex flex-1 overflow-hidden">
+    
+    <!-- Left Navigation Menu -->
+    <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between p-4">
+      <div class="space-y-6">
+        <div class="px-3 py-2 font-black text-indigo-400 text-lg tracking-wider">
+          BAKTI MSS 4G
+        </div>
+        <nav class="space-y-1">
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-indigo-600 text-white font-medium text-sm transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+            Dashboard
+          </a>
+          <a href="#" onclick="alert('Menu 2 (Site Management) dipanggil')" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 font-medium text-sm transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            Site management
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 font-medium text-sm transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            KPI SLA
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 font-medium text-sm transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+            Kebersihan & CCTV
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 font-medium text-sm transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
+            Preventive Maintenance
+          </a>
+        </nav>
+      </div>
+      <div class="text-[11px] text-slate-500 text-center">
+        BAKTI Monitoring System v2.4
+      </div>
+    </aside>
+
+    <!-- Main Container -->
+    <main class="flex-1 p-5 overflow-y-auto space-y-4">
+
+      <!-- Summary Stat Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <!-- Total Sites -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
+          <div>
+            <p class="text-xs uppercase font-bold tracking-wider text-slate-400">Total Sites</p>
+            <h2 id="card-total-sites" class="text-3xl font-extrabold text-white mt-1">0</h2>
+            <p class="text-[10px] text-slate-500 mt-1">Sinkron dari Site Management</p>
+          </div>
+          <div class="p-3 bg-slate-800 rounded-xl text-indigo-400">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path></svg>
+          </div>
+        </div>
+
+        <!-- Online / Active -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
+          <div>
+            <p class="text-xs uppercase font-bold tracking-wider text-emerald-400">Online / Active</p>
+            <h2 id="card-online-sites" class="text-3xl font-extrabold text-emerald-400 mt-1">0</h2>
+            <div class="w-24 bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+              <div id="bar-online" class="bg-emerald-500 h-full w-0 transition-all duration-500"></div>
+            </div>
+          </div>
+          <div class="p-3 bg-emerald-950/50 border border-emerald-800/40 rounded-xl text-emerald-400">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          </div>
+        </div>
+
+        <!-- Warning -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
+          <div>
+            <p class="text-xs uppercase font-bold tracking-wider text-amber-400">Warning</p>
+            <h2 id="card-warning-sites" class="text-3xl font-extrabold text-amber-400 mt-1">0</h2>
+            <div class="w-24 bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+              <div id="bar-warning" class="bg-amber-500 h-full w-0 transition-all duration-500"></div>
+            </div>
+          </div>
+          <div class="p-3 bg-amber-950/50 border border-amber-800/40 rounded-xl text-amber-400">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+          </div>
+        </div>
+
+        <!-- Critical / Offline -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
+          <div>
+            <p class="text-xs uppercase font-bold tracking-wider text-rose-400">Critical / Offline</p>
+            <h2 id="card-critical-sites" class="text-3xl font-extrabold text-rose-400 mt-1">0</h2>
+            <div class="w-24 bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+              <div id="bar-critical" class="bg-rose-500 h-full w-0 transition-all duration-500"></div>
+            </div>
+          </div>
+          <div class="p-3 bg-rose-950/50 border border-rose-800/40 rounded-xl text-rose-400">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map Block Container -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col gap-3">
+        
+        <!-- Controls Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+            <span class="font-bold text-sm text-slate-200">Site Distribution Map</span>
+            <span id="map-counter-tag" class="text-xs bg-slate-700 text-slate-300 px-2.5 py-0.5 rounded-full font-mono ml-2">0 sites</span>
+          </div>
+
+          <!-- Controls Right -->
+          <div class="flex flex-wrap items-center gap-2">
+            <input type="text" id="searchInput" oninput="filterAndRenderMap()" placeholder="Cari Site ID, Nama, Kab/Kota..." 
+                   class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-56">
+
+            <select id="statusFilter" onchange="filterAndRenderMap()" class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-3 py-2 text-slate-200 focus:outline-none">
+              <option value="ALL">Semua Status</option>
+              <option value="ONLINE">Online (Hijau)</option>
+              <option value="WARNING">Warning (Kuning)</option>
+              <option value="CRITICAL">Critical (Merah)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Leaflet Map Area & Floating Detail Panel -->
+        <div class="relative rounded-lg overflow-hidden border border-slate-800">
+          <div id="map"></div>
+
+          <!-- Detail Panel Popover (Default hidden) -->
+          <div id="detailPanel" class="absolute top-3 right-3 bottom-3 w-80 bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl p-4 shadow-2xl z-[1000] hidden flex-col justify-between overflow-y-auto">
+            <div>
+              <div class="flex justify-between items-start mb-3 pb-2 border-b border-slate-800">
+                <div>
+                  <span id="panelSiteId" class="font-mono text-xs text-indigo-400 font-bold block">-</span>
+                  <h3 id="panelSiteName" class="font-bold text-base text-white leading-snug">Site Name</h3>
+                </div>
+                <button onclick="closePanel()" class="text-slate-400 hover:text-white p-1">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <span class="text-slate-500 block">Status Operasional</span>
+                  <span id="panelStatus" class="inline-block px-2.5 py-1 rounded font-bold uppercase mt-1">-</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <span class="text-slate-500 block">Kabupaten/Kota</span>
+                    <span id="panelKabKota" class="text-slate-200 font-medium">-</span>
+                  </div>
+                  <div>
+                    <span class="text-slate-500 block">Kecamatan / Desa</span>
+                    <span id="panelKecDesa" class="text-slate-200 font-medium">-</span>
+                  </div>
+                </div>
+                <div>
+                  <span class="text-slate-500 block">Koordinat Terdeteksi</span>
+                  <span id="panelCoords" class="font-mono text-slate-300 block mt-0.5">-</span>
+                </div>
+                <div>
+                  <span class="text-slate-500 block">Tipe Power / Supplier</span>
+                  <span id="panelPower" class="text-slate-300 block mt-0.5">-</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 mt-4">
+              <button onclick="alert('Mengalihkan ke halaman detail site komplit...')" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs py-2 px-3 rounded-lg transition">
+                Buka Full Management Site
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let map;
+    let markerClusterGroup;
+    let globalSiteData = [];
+
+    // ==========================================
+    // 1. INSIALISASI PETA LEAFLET (NO API KEY REQUIRED)
+    // ==========================================
+    function initDashboardMap() {
+      // Fokus tengah wilayah Indonesia (Papua / Maluku / Nusantara)
+      map = L.map('map', { zoomControl: true }).setView([-3.5, 135.0], 6);
+
+      // Provider Tile Open-Source Bebas Blocked (CartoDB Voyager)
+      const cartoTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap &copy; CARTO'
+      });
+
+      // Layer Backup jika jaringan terisolasi / offline
+      const esriTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri'
+      });
+
+      cartoTile.addTo(map);
+      cartoTile.on('tileerror', function() {
+        console.warn("Tile utama blocked/error, otomatis pindah ke Tile cadangan Esri.");
+        map.removeLayer(cartoTile);
+        esriTile.addTo(map);
+      });
+
+      // Clustering marker untuk menampung ratusan site tanpa lag
+      markerClusterGroup = L.markerClusterGroup({
+        maxClusterRadius: 35,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false
+      });
+      map.addLayer(markerClusterGroup);
+
+      // Panggil Pembacaan Database IndexedDB
+      loadSitesFromIndexedDB();
+    }
+
+    // ==========================================
+    // 2. FORMULA KONVERSI KOORDINAT NMS/OSS
+    // Contoh input dari foto 2: "-283139" -> -2.83139
+    // ==========================================
+    function parseCoordinate(val) {
+      if (!val) return null;
+      let str = val.toString().trim();
+      let num = parseFloat(str);
+
+      if (isNaN(num)) return null;
+
+      // Jika koordinat dalam ribuan/ratusan ribu (misal -283139 atau 1360181)
+      if (Math.abs(num) > 180) {
+        num = num / 100000;
+      }
+      return num;
+    }
+
+    // ==========================================
+    // 3. MEMBACA DATABASE DARI MENU 2 (INDEXEDDB)
+    // ==========================================
+    function loadSitesFromIndexedDB() {
+      document.getElementById('db-status-badge').innerText = "Connecting IndexedDB...";
+
+      // Nama database standar browser / Site Management
+      const request = window.indexedDB.open("TelecomSiteDB", 1);
+
+      request.onerror = function (event) {
+        console.warn("IndexedDB tidak ditemukan, menggunakan Mock Data lokal.");
+        document.getElementById('db-status-badge').innerText = "IndexedDB Offline (Mock Active)";
+        useFallbackMockData();
+      };
+
+      request.onsuccess = function (event) {
+        const db = event.target.result;
+
+        // Memeriksa nama Object Store dari Menu 2 (biasanya 'sites')
+        if (!db.objectStoreNames.contains("sites")) {
+          console.warn("Object store 'sites' belum ada di IndexedDB, menggunakan Mock Data.");
+          document.getElementById('db-status-badge').innerText = "IndexedDB Ready (Mock Active)";
+          useFallbackMockData();
+          return;
+        }
+
+        const transaction = db.transaction(["sites"], "readonly");
+        const objectStore = transaction.objectStore("sites");
+        const getAllRequest = objectStore.getAll();
+
+        getAllRequest.onsuccess = function () {
+          const dbResults = getAllRequest.result;
+
+          if (dbResults && dbResults.length > 0) {
+            document.getElementById('db-status-badge').innerText = `IndexedDB Active (${dbResults.length} records)`;
+            
+            // Format ulang data dari IndexedDB Menu 2
+            globalSiteData = dbResults.map(item => ({
+              id: item.SITE_ID || item.id || `SITE-${Math.floor(Math.random()*1000)}`,
+              name: item.SITE_NAME || item.name || 'Unnamed Site',
+              kabKota: item.KAB_KOTA || item.kabKota || 'N/A',
+              kecamatan: item.KECAMATAN || item.kecamatan || 'N/A',
+              desa: item.DESA || item.desa || 'N/A',
+              lat: parseCoordinate(item.LAT_NMS || item.lat),
+              lng: parseCoordinate(item.LONG_NMS || item.lng),
+              tipePower: item.TIPE_POWER || item.tipePower || 'Solar System',
+              status: item.STATUS || randomStatus() // Mengatur status otomatis jika belum ada
+            }));
+
+            processAndRenderDashboard(globalSiteData);
+          } else {
+            console.log("Database IndexedDB kosong, memuat Mock Data.");
+            document.getElementById('db-status-badge').innerText = "IndexedDB Empty (Mock Active)";
+            useFallbackMockData();
+          }
+        };
+      };
+    }
+
+    // Status acak untuk simulasi tampilan warna titik
+    function randomStatus() {
+      const rand = Math.random();
+      if (rand > 0.3) return 'ONLINE';
+      if (rand > 0.15) return 'WARNING';
+      return 'CRITICAL';
+    }
+
+    // Data cadangan jika Menu 2 belum pernah di-input
+    function useFallbackMockData() {
+      const mockSites = [
+        { id: "PAP0029", name: "TOTOBERI", kabKota: "NABIRE", kecamatan: "WAROPEN", desa: "TOTOBERI", lat: -2.83139, lng: 136.0181, tipePower: "Solar Power System, 1800 Watt", status: "ONLINE" },
+        { id: "PAP0030", name: "SAMANUI", kabKota: "NABIRE", kecamatan: "WAROPEN", desa: "SAMANUI", lat: -2.80528, lng: 135.9758, tipePower: "Solar Power System, 750 Watt", status: "ONLINE" },
+        { id: "PAP0031", name: "KAMARISANOI", kabKota: "NABIRE", kecamatan: "WAROPEN", desa: "KAMARISANOI", lat: -2.71222, lng: 136.0175, tipePower: "Solar Power System, 550 Watt", status: "WARNING" },
+        { id: "PAP0033", name: "KEUW", kabKota: "NABIRE", kecamatan: "WAROPEN", desa: "KEUW", lat: -3.09500, lng: 136.2086, tipePower: "Solar Power System, 550 Watt", status: "CRITICAL" },
+        { id: "PAP0063", name: "KOROMBOBI", kabKota: "KEP. YAPEN", kecamatan: "YAPEN TIMUR", desa: "KOROMBOBI", lat: -1.86139, lng: 136.6211, tipePower: "Solar Hybrid Genset", status: "ONLINE" },
+        { id: "PAP0064", name: "WABO", kabKota: "KEP. YAPEN", kecamatan: "YAPEN TIMUR", desa: "WABO", lat: -1.86278, lng: 136.6039, tipePower: "Green Energy", status: "ONLINE" },
+        { id: "PAP0065", name: "WONSYUPI", kabKota: "KEP. YAPEN", kecamatan: "YAPEN TIMUR", desa: "WONSYUPI", lat: -1.86667, lng: 136.6286, tipePower: "Solar Power System", status: "WARNING" }
+      ];
+
+      // Replikasi mock hingga 186 data sesuai Foto 2
+      globalSiteData = Array.from({ length: 186 }, (_, i) => {
+        const base = mockSites[i % mockSites.length];
+        return {
+          ...base,
+          id: `PAP${String(i + 29).padStart(4, '0')}`,
+          name: `${base.name}-${i + 1}`,
+          lat: base.lat + (Math.random() - 0.5) * 1.5,
+          lng: base.lng + (Math.random() - 0.5) * 1.5,
+          status: randomStatus()
+        };
+      });
+
+      processAndRenderDashboard(globalSiteData);
+    }
+
+    // ==========================================
+    // 4. METRIC COMPUTATION & RENDER MAP
+    // ==========================================
+    function processAndRenderDashboard(data) {
+      // Hitung Statistik
+      const total = data.length;
+      const online = data.filter(d => d.status === 'ONLINE').length;
+      const warning = data.filter(d => d.status === 'WARNING').length;
+      const critical = data.filter(d => d.status === 'CRITICAL').length;
+
+      // Update Angka Card
+      document.getElementById('card-total-sites').innerText = total;
+      document.getElementById('card-online-sites').innerText = online;
+      document.getElementById('card-warning-sites').innerText = warning;
+      document.getElementById('card-critical-sites').innerText = critical;
+
+      // Update Progress Bar Card
+      document.getElementById('bar-online').style.width = total ? `${(online/total)*100}%` : '0%';
+      document.getElementById('bar-warning').style.width = total ? `${(warning/total)*100}%` : '0%';
+      document.getElementById('bar-critical').style.width = total ? `${(critical/total)*100}%` : '0%';
+
+      filterAndRenderMap();
+    }
+
+    function filterAndRenderMap() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const statusFilter = document.getElementById('statusFilter').value;
+
+      markerClusterGroup.clearLayers();
+
+      const filtered = globalSiteData.filter(site => {
+        const matchSearch = site.id.toLowerCase().includes(search) || 
+                            site.name.toLowerCase().includes(search) || 
+                            site.kabKota.toLowerCase().includes(search);
+        const matchStatus = statusFilter === 'ALL' || site.status === statusFilter;
+        return matchSearch && matchStatus;
+      });
+
+      document.getElementById('map-counter-tag').innerText = `${filtered.length} matching sites`;
+
+      filtered.forEach(site => {
+        if (!site.lat || !site.lng) return;
+
+        // Kode warna SVG Pin
+        const color = site.status === 'ONLINE' ? '#10B981' : (site.status === 'WARNING' ? '#F59E0B' : '#EF4444');
+
+        const customPinIcon = L.divIcon({
+          className: 'custom-map-pin',
+          html: `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 5px rgba(0,0,0,0.6);"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        });
+
+        const marker = L.marker([site.lat, site.lng], { icon: customPinIcon });
+        
+        // Event Klik Marker -> Tampilkan Side Panel
+        marker.on('click', () => openDetailPanel(site));
+        markerClusterGroup.addLayer(marker);
+      });
+    }
+
+    // ==========================================
+    // 5. DETAIL PANEL INTERAKTIF
+    // ==========================================
+    function openDetailPanel(site) {
+      const panel = document.getElementById('detailPanel');
+      panel.classList.remove('hidden');
+      panel.classList.add('flex');
+
+      document.getElementById('panelSiteId').innerText = site.id;
+      document.getElementById('panelSiteName').innerText = site.name;
+      document.getElementById('panelKabKota').innerText = site.kabKota;
+      document.getElementById('panelKecDesa').innerText = `${site.kecamatan} / ${site.desa}`;
+      document.getElementById('panelCoords').innerText = `${site.lat.toFixed(5)}, ${site.lng.toFixed(5)}`;
+      document.getElementById('panelPower').innerText = site.tipePower;
+
+      const statusBadge = document.getElementById('panelStatus');
+      statusBadge.innerText = site.status;
+      if (site.status === 'ONLINE') {
+        statusBadge.className = "inline-block px-2.5 py-1 rounded font-bold uppercase bg-emerald-950 text-emerald-400 border border-emerald-800";
+      } else if (site.status === 'WARNING') {
+        statusBadge.className = "inline-block px-2.5 py-1 rounded font-bold uppercase bg-amber-950 text-amber-400 border border-amber-800";
+      } else {
+        statusBadge.className = "inline-block px-2.5 py-1 rounded font-bold uppercase bg-rose-950 text-rose-400 border border-rose-800";
+      }
+    }
+
+    function closePanel() {
+      const panel = document.getElementById('detailPanel');
+      panel.classList.add('hidden');
+      panel.classList.remove('flex');
+    }
+
+    // Jalankan Peta saat halaman dimuat
+    window.onload = initDashboardMap;
+  </script>
+</body>
+</html>
